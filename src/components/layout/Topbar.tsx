@@ -1,4 +1,5 @@
 import { Bell, Search, ChevronDown, Sparkles } from "lucide-react";
+import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 
 export function Topbar() {
@@ -37,13 +38,26 @@ export function Topbar() {
                     <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-background" />
                 </button>
 
-                <div className="flex items-center gap-3 pl-2 cursor-pointer hover:bg-white/5 p-1 rounded-full pr-3 transition-colors">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 border-2 border-background shadow-lg" />
-                    <div className="hidden md:flex flex-col items-start gap-0.5">
-                        <span className="text-xs font-semibold text-white">Alex Designer</span>
-                        <span className="text-[10px] text-muted-foreground">Free Plan</span>
-                    </div>
-                    <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                <div className="flex items-center gap-3 pl-2">
+                    <SignedIn>
+                        <UserButton
+                            appearance={{
+                                elements: {
+                                    avatarBox: "w-8 h-8 rounded-full border-2 border-background shadow-lg"
+                                }
+                            }}
+                        />
+                        <div className="hidden md:flex flex-col items-start gap-0.5">
+                            <span className="text-xs font-semibold text-white">
+                                <span className="opacity-70">Welcome back</span>
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">Free Plan</span>
+                        </div>
+                    </SignedIn>
+                    <SignedOut>
+                        {/* This helps avoids layout shift or provides a fallback if needed */}
+                        <div className="w-8 h-8 rounded-full bg-secondary animate-pulse" />
+                    </SignedOut>
                 </div>
             </div>
         </header>

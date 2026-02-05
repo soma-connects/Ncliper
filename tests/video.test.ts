@@ -58,7 +58,7 @@ describe('Thumbnail System Modules', () => {
         const response = await generateImage("some prompt");
         expect(response).toBeDefined();
         // Check mock structure
-        expect(response.text()).toContain("Test Viral Title"); // Our mock returns this structure for everything currently
+        expect(response?.text ? response.text() : '').toContain("Test Viral Title");
     });
 
     // processor.ts extractFrame is tricky to test without real ffmpeg/network

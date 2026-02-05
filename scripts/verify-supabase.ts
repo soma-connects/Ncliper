@@ -1,0 +1,27 @@
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = 'https://glwcjaqyatkyqvnrkqty.supabase.co';
+const supabaseKey = 'sb_publishable_pPU2g4awOkYHByh46ntRQA_Cj8zqXnw';
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+async function checkConnection() {
+    console.log('Testing Supabase connection...');
+    try {
+        const { data, error } = await supabase.from('projects').select('count', { count: 'exact', head: true });
+
+        if (error) {
+            console.error('Connection failed:', error.message);
+            // Check if it's an auth error vs connection error
+            if (error.code === 'PGRST301') {
+                console.log('NOTE: Auth error is expected if RLS is on and we are anon. But connection reached the server.');
+            }
+        } else {
+            console.log('Connection successful! Table access verified.');
+        }
+    } catch (err) {
+        console.error('Unexpected error:', err);
+    }
+}
+
+checkConnection();

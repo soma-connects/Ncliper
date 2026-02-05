@@ -3,6 +3,7 @@ import ffmpeg from 'fluent-ffmpeg';
 import path from 'path';
 import fs from 'fs';
 import YTDlpWrap from 'youtube-dl-exec';
+import crypto from 'crypto';
 
 // Ensure the clips directory exists
 const CLIPS_DIR = path.join(process.cwd(), 'public', 'clips');
@@ -36,8 +37,8 @@ const getVideoStreamUrl = async (videoUrl: string): Promise<string> => {
         getUrl: true,
         format: '22/18', // Force 720p or similar
         noWarnings: true,
-    }) as any;
-    
+    }) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+
     return (typeof streamUrlOutput === 'string' ? streamUrlOutput : streamUrlOutput.toString()).trim();
 };
 
@@ -74,9 +75,29 @@ export const extractFrame = async (videoUrl: string, timestamp: number): Promise
     });
 };
 
+
+
+// ... (existing imports)
+
+// ...
+
 export const createViralClip = async (videoUrl: string, startTime: number, endTime: number, captions: CaptionChunk[] = []): Promise<string> => {
     return new Promise(async (resolve, reject) => {
         try {
+            // Generate a unique ID based on parameters to enable caching
+            const paramsHash = crypto.createHash('md5')
+                .update(`${videoUrl}-${startTime}-${endTime}-${JSON.stringify(captions)}`)
+                .digest('hex');
+
+            const fileName = `clip_${paramsHash}.mp4`;
+            const outputPath = path.join(CLIPS_DIR, fileName);
+
+            // CACHE HIT: Return immediately if file exists
+            if (fs.existsSync(outputPath)) {
+                console.log('Serving clip from cache:', fileName);
+                return resolve(`/clips/${fileName}`);
+            }
+
             // 1. Configure FFmpeg Path
             const localFfmpeg = path.join(process.cwd(), 'ffmpeg.exe');
             if (fs.existsSync(localFfmpeg)) {
@@ -91,9 +112,7 @@ export const createViralClip = async (videoUrl: string, startTime: number, endTi
             }
 
             const duration = endTime - startTime;
-            const clipId = `clip_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-            const fileName = `${clipId}.mp4`;
-            const outputPath = path.join(CLIPS_DIR, fileName);
+
 
             // Prepare Complex Filters
             // Goal: Blur Fill (Original video centered, blurred background filling 9:16 frame)

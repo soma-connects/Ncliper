@@ -53,6 +53,7 @@ const hookSchema = {
 };
 
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const generateWithRetry = async (model: any, prompt: string, retries = 3, delay = 1000): Promise<any> => {
     try {
         return await model.generateContent(prompt);
@@ -97,14 +98,8 @@ export const analyzeTranscript = async (transcript: string) => {
     }
 
     try {
-        // Use "gemini-3-flash-preview" as requested by the user and confirmed in available models.
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const model = genAI.getGenerativeModel({
-            model: "gemini-3-flash-preview",
-        });
-
-        // Using "gemini-3-flash-preview"
-        const analysisModel = genAI.getGenerativeModel({
+        // Primary Model: gemini-3-flash-preview
+        const primaryModel = genAI.getGenerativeModel({
             model: "gemini-3-flash-preview",
             generationConfig: {
                 responseMimeType: "application/json",
@@ -122,21 +117,42 @@ export const analyzeTranscript = async (transcript: string) => {
   - Return this as ONE hook with \`segments: [{start: 0, end: 30}, {start: 120, end: 150}]\`.
   - The total duration of all segments combined must be between 60 and 180 seconds.
 
-  Content Types:
-  1. "The Deep Dive": Explain a concept fully. If the explanation is split, merge the parts.
-  2. "The Story Arc": Setup -> Conflict -> Resolution. Skip the boring middle.
-  3. "The Contrarian Argument": Premise -> Evidence -> Conclusion.
+  **VIRALITY RUBRIC (Scoring 0-100):**
+  1. **Hook Strength (40%)**: Does the first 3 seconds grab attention? (e.g. "I almost died...", "You won't believe...", "The secret to...")
+  2. **Pacing (30%)**: Is the content dense? (Remove pauses, filler words, slow transitions = High Pacing)
+  3. **Emotional/Intellectual Value (30%)**: Does it trigger curiosity, anger, awe, or provide high utility?
 
-  **Scoring Rule**: 
-  - High scores (90-99) for intelligently merged clips that cut out fluff to tell a better story.
+  Content Types:
+  1. "The Deep Dive": Explain a concept fully. (Hormozi Style: Hook -> Value -> Value -> CTA)
+  2. "The Story Arc": Setup -> Conflict -> Resolution. (MrBeast Style: High stakes immediately)
+  3. "The Contrarian Argument": Premise -> Evidence -> Conclusion.
 
   Transcript: "${transcript.slice(0, 25000)}" 
   
   Return ONLY a JSON array following the requested schema. Ensure \`segments\` contains the precise cuts.
 `;
 
-        const result = await generateWithRetry(analysisModel, prompt);
-        return result.response.text();
+        try {
+            console.log("Analyzing with Gemini 3 Flash Preview...");
+            const result = await generateWithRetry(primaryModel, prompt);
+            return result.response.text();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (error: any) {
+            console.warn("Gemini 3 Flash Preview failed/overloaded. Falling back to Gemini 2.0 Flash Lite...", error.message);
+
+            // Fallback Model: gemini-2.0-flash-lite
+            const fallbackModel = genAI.getGenerativeModel({
+                model: "gemini-2.0-flash-lite",
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    responseSchema: hookSchema as any,
+                }
+            });
+
+            const result = await generateWithRetry(fallbackModel, prompt);
+            return result.response.text();
+        }
 
     } catch (error) {
         console.error("Virality Engine Error:", error);

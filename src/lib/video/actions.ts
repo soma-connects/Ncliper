@@ -7,6 +7,10 @@ import { createViralClip, extractFrame } from './processor';
 import { generateCaptionChunks } from './captions';
 import { generateClipMetadata } from './metadata';
 import { generateImage } from './image-gen';
+import { supabaseAdmin as supabase } from '@/lib/supabase/server';
+// Renaming to 'supabase' to minimize code changes below, but it's the admin client.
+
+// ... (rest of imports)
 
 // Helper to fetch and parse transcripts
 async function fetchTranscript(url: string, ytDlpPath: string): Promise<string> {
@@ -109,6 +113,13 @@ export async function getVideoTitle(url: string, ytDlpPathArg?: string): Promise
     }
 }
 
+// Helper to format duration
+function formatDuration(seconds: number): string {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
 export async function getViralHooks(url: string) {
     try {
         if (!url) {
@@ -117,6 +128,14 @@ export async function getViralHooks(url: string) {
 
         const path = await import('path');
         const ytDlpPath = path.join(process.cwd(), 'node_modules', 'youtube-dl-exec', 'bin', 'yt-dlp.exe');
+
+        // Extract video ID from URL
+        let videoId = "";
+        if (url.includes('v=')) {
+            videoId = url.split('v=')[1]?.split('&')[0];
+        } else if (url.includes('youtu.be/')) {
+            videoId = url.split('youtu.be/')[1]?.split('?')[0];
+        }
 
         // 1. Fetch Real Transcript
         let transcript = "";
@@ -133,14 +152,39 @@ export async function getViralHooks(url: string) {
         const hooksJson = await analyzeTranscript(transcript);
 
         // Ensure we parse it if it returns a string (Gemini SDK returns string usually, but we want object)
-        // analyzeTranscript returns result.response.text().
-        // We need to clean it to ensure JSON.
         const cleanedJson = hooksJson.replace(/```json/g, '').replace(/```/g, '').trim();
         const hooks = JSON.parse(cleanedJson);
 
-        return { hooks, transcript }; // Return transcript as well
-
+        // 3. Map to Clip objects
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const clips = await Promise.all(hooks.map(async (hook: any, index: number) => {
+            // Fetch captions for this specific segment to populate the editor
+            const transcriptSegments = await fetchCaptions(url, ytDlpPath, hook.start_time, hook.end_time);
+
+            // Map raw captions to TranscriptSegment
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const formattedTranscript = transcriptSegments.map((s: any) => ({
+                timestamp: formatDuration(s.start),
+                text: s.text
+            }));
+
+            return {
+                id: index + 1,
+                title: hook.type || `Viral Clip ${index + 1}`,
+                score: hook.virality_score,
+                duration: formatDuration(hook.end_time - hook.start_time),
+                url: url, // Original URL for now, or YouTube embed URL
+                videoId: videoId,
+                thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`, // Use YouTube thumbnail
+                startTime: hook.start_time,
+                endTime: hook.end_time,
+                segments: hook.segments,
+                transcript: formattedTranscript
+            };
+        }));
+
+        return { clips };
+
     } catch (error: any) {
         console.error("Error analyzing viral hooks:", error);
         return { error: error.message || "Failed to analyze video" };
@@ -337,4 +381,105 @@ export async function generateAIThumbnailAction(prompt: string) {
         console.error("AI Thumbnail Error:", e);
         return { error: "Failed to generate AI thumbnail" };
     }
+}
+
+export async function processVideoForProject(projectId: string, videoUrl: string) {
+    try {
+        console.log(`[Action] Processing video for project ${projectId}...`);
+
+        // 1. Update status to processing
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await supabase.from('projects').update({ status: 'processing' } as any).eq('id', projectId);
+
+        // 2. Analyze video
+        // getViralHooks now returns { clips } or { error }
+        const { clips, error } = await getViralHooks(videoUrl);
+
+        if (error || !clips) {
+            console.error("Analysis failed:", error);
+            await supabase.from('projects').update({ status: 'failed' }).eq('id', projectId);
+            return { error: error || "Analysis failed" };
+        }
+
+        // 3. Save Clips
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const clipsToInsert = clips.map((clip: any) => ({
+            project_id: projectId,
+            title: clip.title,
+            start_time: clip.startTime,
+            end_time: clip.endTime,
+            virality_score: clip.score,
+            transcript_segment: clip.transcript, // Storing formatted transcript as JSON
+            video_url: '', // Will be filled when clip is generated
+        }));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: insertError } = await supabase.from('clips').insert(clipsToInsert as any);
+        if (insertError) throw insertError;
+
+        // 4. Update status to completed
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await supabase.from('projects').update({ status: 'completed' } as any).eq('id', projectId);
+
+        return { success: true, count: clipsToInsert.length };
+
+    } catch (e: any) {
+        console.error("Process Video Error:", e);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await supabase.from('projects').update({ status: 'failed' } as any).eq('id', projectId);
+        return { error: e.message };
+    }
+}
+
+export async function getProjectClips(projectId: string) {
+    try {
+        // 1. Get Project URL (Main Video)
+        const { data: project } = await supabase
+            .from('projects')
+            .select('video_url')
+            .eq('id', projectId)
+            .single();
+
+        const projectVideoUrl = project?.video_url || '';
+
+        // 2. Get Clips
+        const { data, error } = await supabase
+            .from('clips')
+            .select('*')
+            .eq('project_id', projectId)
+            .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        // Map database columns to Clip type
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return data.map((c: any) => {
+            // Use generated clip URL if exists, else fallback to main video URL
+            const finalUrl = c.video_url || projectVideoUrl;
+            const videoId = extractVideoId(finalUrl);
+
+            return {
+                id: c.id,
+                title: c.title,
+                score: c.virality_score || 0,
+                duration: formatDuration((c.end_time || 0) - (c.start_time || 0)),
+                url: finalUrl,
+                videoId: videoId,
+                thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+                startTime: c.start_time,
+                endTime: c.end_time,
+                segments: c.transcript_segment ? (Array.isArray(c.transcript_segment) ? c.transcript_segment : []) : [],
+                transcript: []
+            };
+        });
+    } catch (e) {
+        console.error("Fetch Clips Error:", e);
+        return [];
+    }
+}
+
+function extractVideoId(url: string) {
+    if (url.includes('v=')) return url.split('v=')[1]?.split('&')[0];
+    if (url.includes('youtu.be/')) return url.split('youtu.be/')[1]?.split('?')[0];
+    return '';
 }

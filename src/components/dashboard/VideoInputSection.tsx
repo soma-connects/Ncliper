@@ -3,23 +3,27 @@
 import { useState } from 'react';
 import { Youtube, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getVideoTitle } from '@/lib/video/actions';
+import { getVideoTitle, getViralHooks } from '@/lib/video/actions';
+import { Clip } from '@/lib/video/types';
 
 interface VideoInputSectionProps {
-    onVideoFound: (url: string, title: string) => void;
+    onVideoFound: (url: string, title: string, clips: Clip[]) => void;
+    isLoading?: boolean;
 }
 
-export function VideoInputSection({ onVideoFound }: VideoInputSectionProps) {
+export function VideoInputSection({ onVideoFound, isLoading = false }: VideoInputSectionProps) {
     const [url, setUrl] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [localLoading, setLocalLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [statusMessage, setStatusMessage] = useState<string>("");
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!url) return;
 
-        setLoading(true);
+        setLocalLoading(true);
         setError(null);
+        setStatusMessage("Fetching video metadata...");
 
         try {
             // Basic validation
@@ -27,23 +31,33 @@ export function VideoInputSection({ onVideoFound }: VideoInputSectionProps) {
                 throw new Error("Please enter a valid YouTube URL");
             }
 
-            const result = await getVideoTitle(url);
-            if (result.error) {
-                throw new Error(result.error);
-            }
+            // 1. Get Title (Fast)
+            const titleResult = await getVideoTitle(url);
+            if (titleResult.error) throw new Error(titleResult.error);
 
-            if (result.title) {
-                onVideoFound(url, result.title);
+            setStatusMessage("Analyzing transcript for viral hooks...");
+
+            // 2. Get Viral Hooks (Slow)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const hooksResult = await getViralHooks(url) as any; // Cast to avoid build type issues for now if actions.ts types aren't fully inferred yet
+            if (hooksResult.error) throw new Error(hooksResult.error);
+
+            if (titleResult.title && hooksResult.clips) {
+                setStatusMessage("Finalizing...");
+                onVideoFound(url, titleResult.title, hooksResult.clips);
+                setLocalLoading(false);
             } else {
-                throw new Error("Could not find video title");
+                throw new Error("Could not analyze video");
             }
 
         } catch (err: any) {
             setError(err.message || "Something went wrong");
-        } finally {
-            setLoading(false);
+            setLocalLoading(false);
+            setStatusMessage("");
         }
     };
+
+    const isBusy = localLoading || isLoading;
 
     return (
         <div className="w-full max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
@@ -74,22 +88,22 @@ export function VideoInputSection({ onVideoFound }: VideoInputSectionProps) {
                         onChange={(e) => setUrl(e.target.value)}
                         placeholder="Paste YouTube Link (e.g. https://youtube.com/watch?v=...)"
                         className="flex-1 bg-transparent border-none text-white placeholder:text-muted-foreground/50 focus:outline-none focus:ring-0 text-lg py-2"
-                        disabled={loading}
+                        disabled={isBusy}
                     />
                     <button
                         type="submit"
-                        disabled={loading || !url}
+                        disabled={isBusy || !url}
                         className={cn(
                             "h-12 px-6 rounded-xl font-semibold text-white shadow-lg transition-all flex items-center gap-2",
-                            loading
+                            isBusy
                                 ? "bg-muted cursor-not-allowed"
                                 : "bg-primary hover:bg-primary/90 hover:shadow-primary/25 active:scale-95"
                         )}
                     >
-                        {loading ? (
+                        {isBusy ? (
                             <>
                                 <Loader2 className="w-5 h-5 animate-spin" />
-                                <span>Analyzing...</span>
+                                <span>{statusMessage || 'Analyzing...'}</span>
                             </>
                         ) : (
                             <>
