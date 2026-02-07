@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ncliper - Viral Video Clipper
 
-## Getting Started
+AI-powered video clipper that transforms long-form YouTube videos into viral short-form content.
 
-First, run the development server:
+## Prerequisites
+
+- **Node.js**: v18 or later.
+- **FFmpeg**: Must be installed and available in your system PATH, or placed in the project root as `ffmpeg.exe` (Windows).
+- **Python**: Required for `yt-dlp` to function correctly.
+
+## Installation
+
+1.  **Clone the repository**:
+    ```bash
+    git clone https://github.com/your-username/ncliper.git
+    cd ncliper
+    ```
+
+2.  **Install Dependencies**:
+    ```bash
+    npm install
+    ```
+
+3.  **Environment Setup**:
+    - Copy `.env.example` to `.env.local`:
+      ```bash
+      cp .env.example .env.local
+      ```
+    - Fill in the required keys (Supabase, Google Gemini, Clerk).
+
+4.  **Native Binaries (Important)**:
+    - This project uses `fluent-ffmpeg` and `youtube-dl-exec`.
+    - **Windows**: Ensure `ffmpeg.exe` is in the project root or globally in PATH.
+    - **Mac/Linux**: Install via Homebrew/apt (`brew install ffmpeg`).
+
+## Development
+
+Run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) with your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `npm run dev`: Start dev server.
+- `npm run build`: Build for production.
+- `npm run lint`: Run Next.js linter.
+- `npm run typecheck`: Run TypeScript compiler check.
+- `npm test`: Run Jest tests.
 
-## Learn More
+## Architecture
 
-To learn more about Next.js, take a look at the following resources:
+- **Frontend**: Next.js 15 (App Router), React, TailwindCSS.
+- **Backend Actions**: Server Actions in `src/lib/video`.
+- **AI**: Google Gemini (Flash 1.5/2.0) for virality analysis.
+- **Processing**: FFmpeg for cutting, cropping, and captioning.
+- **Database**: Supabase (PostgreSQL).
+- **Auth**: Clerk.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Security Note
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Video processing uses `youtube-dl-exec` and `ffmpeg`. Input URLs are validated, but ensure your server environment is secure. Do not expose `ffmpeg` arguments directly to user input.

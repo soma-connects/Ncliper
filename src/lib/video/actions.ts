@@ -7,10 +7,15 @@ import { createViralClip, extractFrame } from './processor';
 import { generateCaptionChunks } from './captions';
 import { generateClipMetadata } from './metadata';
 import { generateImage } from './image-gen';
-import { supabaseAdmin as supabase } from '@/lib/supabase/server';
-// Renaming to 'supabase' to minimize code changes below, but it's the admin client.
+import { supabaseAdmin } from '@/lib/supabase/server';
+import { Database } from '@/lib/supabase/types';
+import { SupabaseClient } from '@supabase/supabase-js';
 
-// ... (rest of imports)
+const supabase = supabaseAdmin as SupabaseClient<Database>;
+
+// Helper types
+type ClipInsert = Database['public']['Tables']['clips']['Insert'];
+type ProjectUpdate = Database['public']['Tables']['projects']['Update'];
 
 // Helper to fetch and parse transcripts
 async function fetchTranscript(url: string, ytDlpPath: string): Promise<string> {
@@ -388,8 +393,9 @@ export async function processVideoForProject(projectId: string, videoUrl: string
         console.log(`[Action] Processing video for project ${projectId}...`);
 
         // 1. Update status to processing
+        const processingUpdate: Database['public']['Tables']['projects']['Update'] = { status: 'processing' };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await supabase.from('projects').update({ status: 'processing' } as any).eq('id', projectId);
+        await (supabase.from('projects') as any).update(processingUpdate).eq('id', projectId);
 
         // 2. Analyze video
         // getViralHooks now returns { clips } or { error }
@@ -397,36 +403,40 @@ export async function processVideoForProject(projectId: string, videoUrl: string
 
         if (error || !clips) {
             console.error("Analysis failed:", error);
-            await supabase.from('projects').update({ status: 'failed' }).eq('id', projectId);
+            const failedUpdate: ProjectUpdate = { status: 'failed' };
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (supabase.from('projects') as any).update(failedUpdate).eq('id', projectId);
             return { error: error || "Analysis failed" };
         }
 
         // 3. Save Clips
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const clipsToInsert = clips.map((clip: any) => ({
+        const clipsToInsert: ClipInsert[] = clips.map((clip: any) => ({
             project_id: projectId,
             title: clip.title,
             start_time: clip.startTime,
             end_time: clip.endTime,
             virality_score: clip.score,
-            transcript_segment: clip.transcript, // Storing formatted transcript as JSON
+            transcript_segment: clip.transcript as unknown as Database['public']['Tables']['clips']['Insert']['transcript_segment'], // Explicit cast for Json compatibility
             video_url: '', // Will be filled when clip is generated
         }));
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error: insertError } = await supabase.from('clips').insert(clipsToInsert as any);
+        const { error: insertError } = await (supabase.from('clips') as any).insert(clipsToInsert);
         if (insertError) throw insertError;
 
         // 4. Update status to completed
+        const completedUpdate: ProjectUpdate = { status: 'completed' };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await supabase.from('projects').update({ status: 'completed' } as any).eq('id', projectId);
+        await (supabase.from('projects') as any).update(completedUpdate).eq('id', projectId);
 
         return { success: true, count: clipsToInsert.length };
 
     } catch (e: any) {
         console.error("Process Video Error:", e);
+        const failedUpdate: ProjectUpdate = { status: 'failed' };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await supabase.from('projects').update({ status: 'failed' } as any).eq('id', projectId);
+        await (supabase.from('projects') as any).update(failedUpdate).eq('id', projectId);
         return { error: e.message };
     }
 }
@@ -434,8 +444,8 @@ export async function processVideoForProject(projectId: string, videoUrl: string
 export async function getProjectClips(projectId: string) {
     try {
         // 1. Get Project URL (Main Video)
-        const { data: project } = await supabase
-            .from('projects')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: project } = await (supabase.from('projects') as any)
             .select('video_url')
             .eq('id', projectId)
             .single();
@@ -443,8 +453,8 @@ export async function getProjectClips(projectId: string) {
         const projectVideoUrl = project?.video_url || '';
 
         // 2. Get Clips
-        const { data, error } = await supabase
-            .from('clips')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data, error } = await (supabase.from('clips') as any)
             .select('*')
             .eq('project_id', projectId)
             .order('created_at', { ascending: true });
@@ -482,4 +492,12 @@ function extractVideoId(url: string) {
     if (url.includes('v=')) return url.split('v=')[1]?.split('&')[0];
     if (url.includes('youtu.be/')) return url.split('youtu.be/')[1]?.split('?')[0];
     return '';
+}
+
+export async function generateMoreClipsAction(videoUrl: string, projectId: string) {
+    // Re-run the analysis (random seed in virality.ts ensures variety)
+    // We reuse processVideoForProject which handles DB updates too
+    console.log("[Action] Generating MORE clips for project:", projectId);
+    const result = await processVideoForProject(projectId, videoUrl);
+    return result;
 }

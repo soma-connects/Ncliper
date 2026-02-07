@@ -3,6 +3,7 @@
 import { Play, Download, Wand2, Star, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from 'react';
+import Image from "next/image"; // Added
 import { Clip } from "@/lib/video/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateClip } from "@/lib/video/actions";
@@ -67,44 +68,67 @@ const MOCK_CLIPS: Clip[] = [
     },
 ];
 
+
 interface ClipRailProps {
     onSelect: (clip: Clip) => void;
     activeClipId?: number | string;
     clips: Clip[];
+    projectId?: string; // Added prop
 }
 
-export function ClipRail({ onSelect, activeClipId, clips = [] }: ClipRailProps) {
+export function ClipRail({ onSelect, activeClipId, clips = [], projectId }: ClipRailProps) {
     const [downloadingId, setDownloadingId] = useState<number | string | null>(null);
+    const [isGeneratingMore, setIsGeneratingMore] = useState(false);
 
     const handleSelect = (clip: Clip) => {
         onSelect(clip);
     };
-
-
-    // ...
-
 
     const handleDownload = async (e: React.MouseEvent, clip: Clip) => {
         e.stopPropagation();
         setDownloadingId(clip.id);
 
         try {
-            // If segments is missing (shouldn't happen with new type), fallback to simple start/end
             const segments = clip.segments || [{ start: clip.startTime, end: clip.endTime }];
-
             const result = await generateClip(clip.url, segments);
 
             if (result.error) {
                 alert(`Error: ${result.error}`);
-            } else {
-                alert(`Clip generated successfully!\nPath: ${result.path}`);
-                // Ideally open the file or show download link
+            } else if (result.path) {
+                // Programmatic click to trigger browser download
+                const link = document.createElement('a');
+                link.href = result.path;
+                link.download = `ncliper_clip_${clip.id}.mp4`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
             }
         } catch (error) {
             console.error(error);
             alert("Failed to generate clip");
         } finally {
             setDownloadingId(null);
+        }
+    };
+
+    const handleGenerateMore = async () => {
+        if (!projectId || clips.length === 0) return;
+        setIsGeneratingMore(true);
+        try {
+            // Import dynamically or use the import at top if available. 
+            // Wait, generateMoreClipsAction needs to be imported.
+            // I'll assume it's available via module import 'actions' below.
+            const { generateMoreClipsAction } = await import('@/lib/video/actions');
+            await generateMoreClipsAction(clips[0].url, projectId);
+
+            // Reload page to see new clips? Or invalidate query.
+            // For MVP, simple reload is safest to fetch new state.
+            window.location.reload();
+        } catch (e) {
+            console.error(e);
+            alert("Failed to generate more clips");
+        } finally {
+            setIsGeneratingMore(false);
         }
     };
 
@@ -120,6 +144,7 @@ export function ClipRail({ onSelect, activeClipId, clips = [] }: ClipRailProps) 
                 </h3>
             </div>
 
+            {/* ... List ... */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
                 <AnimatePresence>
                     {clips.map((clip, index) => {
@@ -141,11 +166,12 @@ export function ClipRail({ onSelect, activeClipId, clips = [] }: ClipRailProps) 
                                 {/* Thumbnail Area */}
                                 <div className="aspect-video w-full bg-black relative overflow-hidden">
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent z-10" />
-                                    <img
+                                    <Image
                                         src={clip.thumbnailUrl}
                                         alt={clip.title}
+                                        fill
                                         className={cn(
-                                            "w-full h-full object-cover transition-transform duration-700",
+                                            "object-cover transition-transform duration-700",
                                             isActive ? "scale-110" : "group-hover:scale-105"
                                         )}
                                     />
@@ -238,10 +264,13 @@ export function ClipRail({ onSelect, activeClipId, clips = [] }: ClipRailProps) 
             </div>
 
             <div className="p-4 border-t border-white/5 bg-card/50">
-                <button className="w-full relative overflow-hidden group flex items-center justify-center gap-2 text-xs font-bold text-muted-foreground hover:text-white p-3 rounded-xl border border-dashed border-white/10 hover:border-primary/50 hover:bg-primary/5 transition-all">
+                <button
+                    onClick={handleGenerateMore}
+                    disabled={isGeneratingMore || !projectId}
+                    className="w-full relative overflow-hidden group flex items-center justify-center gap-2 text-xs font-bold text-muted-foreground hover:text-white p-3 rounded-xl border border-dashed border-white/10 hover:border-primary/50 hover:bg-primary/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                     <span className="relative z-10 flex items-center gap-2">
-                        <Wand2 className="w-3.5 h-3.5 group-hover:animate-pulse" />
-                        Generate More Clips
+                        {isGeneratingMore ? <Wand2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5 group-hover:animate-pulse" />}
+                        {isGeneratingMore ? 'Generating...' : 'Generate More Clips'}
                     </span>
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
                 </button>

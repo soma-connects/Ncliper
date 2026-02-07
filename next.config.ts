@@ -7,6 +7,22 @@ const nextConfig: NextConfig = {
     // Runs the compiler in a separate worker to protect the main process
     webpackBuildWorker: true,
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'img.youtube.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'commondatastorage.googleapis.com',
+      },
+    ],
+  },
   // Disable source maps in production to save up to 30% RAM
   productionBrowserSourceMaps: false,
   webpack: (config, { isServer }) => {

@@ -76,6 +76,12 @@ const generateWithRetry = async (model: any, prompt: string, retries = 3, delay 
                 }
             }
 
+            // Safety: If wait time is > 20s, fail fast to avoid serverless timeouts
+            if (waitTime > 20000) {
+                console.error(`Gemini Rate Limit. Required wait ${waitTime}ms exceeds timeout safety.`);
+                throw new Error(`Rate limit exceeded. Please try again in ${Math.ceil(waitTime / 1000)} seconds.`);
+            }
+
             console.warn(`Gemini API 429 Rate Limit. Retrying in ${waitTime}ms... (${retries} retries left)`);
             await new Promise(resolve => setTimeout(resolve, waitTime));
             return generateWithRetry(model, prompt, retries - 1, delay * 2);
@@ -98,9 +104,15 @@ export const analyzeTranscript = async (transcript: string) => {
     }
 
     try {
-        // Primary Model: gemini-3-flash-preview
+        // Optimized Strategy:
+        // 1. Try 'gemini-2.0-flash' (Standard, usually has better free tier availability than Lite)
+        // 2. Fallback to 'gemini-flash-latest' (Valid alias for stable Flash model)
+
+        const primaryModelName = "gemini-2.0-flash";
+        const fallbackModelName = "gemini-flash-latest";
+
         const primaryModel = genAI.getGenerativeModel({
-            model: "gemini-3-flash-preview",
+            model: primaryModelName,
             generationConfig: {
                 responseMimeType: "application/json",
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -122,27 +134,35 @@ export const analyzeTranscript = async (transcript: string) => {
   2. **Pacing (30%)**: Is the content dense? (Remove pauses, filler words, slow transitions = High Pacing)
   3. **Emotional/Intellectual Value (30%)**: Does it trigger curiosity, anger, awe, or provide high utility?
 
+  **PRECISION RULE**: 
+  - Segments MUST start at the beginning of a complete sentence or a clear visual cut. 
+  - Do NOT start mid-sentence. 
+  - Verify timestamp precision to 0.1s.
+
   Content Types:
   1. "The Deep Dive": Explain a concept fully. (Hormozi Style: Hook -> Value -> Value -> CTA)
   2. "The Story Arc": Setup -> Conflict -> Resolution. (MrBeast Style: High stakes immediately)
   3. "The Contrarian Argument": Premise -> Evidence -> Conclusion.
 
-  Transcript: "${transcript.slice(0, 25000)}" 
+  Transcript: "${transcript.slice(0, 20000)}" 
   
   Return ONLY a JSON array following the requested schema. Ensure \`segments\` contains the precise cuts.
+  
+  [Random Seed: ${Math.random()}]
 `;
 
         try {
-            console.log("Analyzing with Gemini 3 Flash Preview...");
-            const result = await generateWithRetry(primaryModel, prompt);
+            console.log(`Analyzing with ${primaryModelName}...`);
+            // Reduce retries to 1 for the primary to avoid burning quota instantly
+            const result = await generateWithRetry(primaryModel, prompt, 1);
             return result.response.text();
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (error: any) {
-            console.warn("Gemini 3 Flash Preview failed/overloaded. Falling back to Gemini 2.0 Flash Lite...", error.message);
+            console.warn(`${primaryModelName} failed/overloaded. Falling back to ${fallbackModelName}...`, error.message);
 
-            // Fallback Model: gemini-2.0-flash-lite
+            // Fallback Model
             const fallbackModel = genAI.getGenerativeModel({
-                model: "gemini-2.0-flash-lite",
+                model: fallbackModelName,
                 generationConfig: {
                     responseMimeType: "application/json",
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -150,12 +170,13 @@ export const analyzeTranscript = async (transcript: string) => {
                 }
             });
 
-            const result = await generateWithRetry(fallbackModel, prompt);
+            // Try fallback with 1 retry as well
+            const result = await generateWithRetry(fallbackModel, prompt, 1);
             return result.response.text();
         }
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Virality Engine Error:", error);
-        throw new Error("Failed to analyze transcript");
+        throw new Error(error.message || "Failed to analyze transcript");
     }
 };

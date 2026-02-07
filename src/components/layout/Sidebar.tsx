@@ -56,17 +56,22 @@ export function Sidebar() {
             </nav>
 
             <div className="p-4 border-t border-border/40">
-                <div className="glass-card p-4 rounded-xl mb-4">
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="text-xs font-semibold text-muted-foreground">CREDITS</span>
-                        <span className="text-xs font-bold text-white">85%</span>
+                <div className="glass-card p-4 rounded-xl mb-4 border border-white/5 bg-gradient-to-b from-white/5 to-transparent">
+                    <div className="flex justify-between items-center mb-3">
+                        <span className="text-xs font-semibold text-muted-foreground tracking-wider">CREDITS</span>
+                        <span className="text-xs font-bold text-primary">85%</span>
                     </div>
-                    <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-blue-500 to-purple-500 w-[85%] rounded-full shadow-[0_0_10px_rgba(139,92,246,0.5)]" />
+                    <div className="h-2 w-full bg-secondary/50 rounded-full overflow-hidden mb-2">
+                        <div className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 w-[85%] rounded-full shadow-[0_0_10px_rgba(168,85,247,0.4)] animate-pulse" />
                     </div>
-                    <p className="text-[10px] text-muted-foreground mt-2">
-                        45/60 mins remaining
-                    </p>
+                    <div className="flex justify-between items-center text-[10px] text-muted-foreground">
+                        <span>45m left</span>
+                        <span>60m limit</span>
+                    </div>
+
+                    <button className="w-full mt-3 py-1.5 text-xs font-medium bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-lg transition-colors">
+                        Upgrade Plan
+                    </button>
                 </div>
 
                 <button className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-muted-foreground hover:bg-red-500/10 hover:text-red-400 transition-colors">

@@ -109,11 +109,12 @@ export function EditorView({ projectTitle, projectId, initialClips = [] }: Edito
 
                 {/* 1. Clip Rail (Left) */}
                 <div className={cn(
-                    "lg:block h-full shrink-0 lg:w-80 transition-all",
+                    "lg:block h-full shrink-0 lg:w-[400px] transition-all",
                     selectedTab === 'clips' ? "block w-full" : "hidden"
                 )}>
                     <ClipRail
                         clips={clips}
+                        projectId={projectId}
                         onSelect={(clip) => {
                             setSelectedClip(clip);
                             if (window.innerWidth < 1024) setSelectedTab('player'); // Auto-switch to player on mobile

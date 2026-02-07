@@ -1,7 +1,8 @@
 'use client';
 
+
 import { Play, Pause, SkipBack, SkipForward, Maximize2, Volume2 } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clip } from '@/lib/video/types';
@@ -15,20 +16,29 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [progress, setProgress] = useState(0);
+    const [currentTime, setCurrentTime] = useState(0);
 
     const isYouTube = clip?.url?.includes('youtube.com') || clip?.url?.includes('youtu.be');
 
-    // Construct YouTube Embed URL
-    // Use rel=0 to avoid related videos, autoplay=1 for consistent behavior
-    const embedUrl = isYouTube && clip?.videoId
-        ? `https://www.youtube.com/embed/${clip.videoId}?start=${Math.floor(clip.startTime)}&end=${Math.floor(clip.endTime)}&autoplay=${isPlaying ? 1 : 0}&rel=0&modestbranding=1&controls=0`
-        : null;
+    // YouTube Embed: Use simpler integers but try to respect bounds
+    // Note: YouTube 'end' param stops playback. It does not loop automatically.
+    // For MVP, stopping at end is better than playing next video.
+    const embedUrl = useMemo(() => {
+        if (!isYouTube || !clip?.videoId) return null;
+        return `https://www.youtube.com/embed/${clip.videoId}?start=${Math.floor(clip.startTime)}&end=${Math.ceil(clip.endTime)}&autoplay=${isPlaying ? 1 : 0}&rel=0&modestbranding=1&controls=0&cc_load_policy=0`;
+    }, [isYouTube, clip, isPlaying]);
 
     // Reset playing state when clip changes
     useEffect(() => {
         if (clip) {
-            setIsPlaying(true); // Auto-play on select
+            setIsPlaying(true);
             setProgress(0);
+            setCurrentTime(clip.startTime);
+            // If local video, seek to start
+            if (videoRef.current) {
+                videoRef.current.currentTime = clip.startTime;
+                videoRef.current.play().catch(() => setIsPlaying(false));
+            }
         } else {
             setIsPlaying(false);
         }
@@ -37,13 +47,8 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
     const togglePlay = () => {
         setIsPlaying(!isPlaying);
         if (isYouTube) {
-            // For iframe, we depend on re-rendering with autoplay param or posting message
-            // Re-rendering is simpler for generic embed, but postMessage is better for control.
-            // For this MVF, simply toggling state refetches iframe or we use the overlay.
-            // Actually, iframe reload is jarring. 
-            // Ideally use youtube-player API, but for now, the 'autoplay' param toggle forces reload.
-            // A better UX for simple iframe is just controls=1, but we want custom controls.
-            // Let's stick to the simple toggle for now, accepting the reload.
+            // Iframe toggle handled by re-render/autoplay param mainly
+            // or we accept it's just an overlay toggle
         } else if (videoRef.current) {
             if (isPlaying) videoRef.current.pause();
             else videoRef.current.play();
@@ -51,11 +56,76 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
     };
 
     const handleTimeUpdate = () => {
-        if (videoRef.current) {
+        if (videoRef.current && clip) {
             const current = videoRef.current.currentTime;
-            const duration = videoRef.current.duration || 1;
-            setProgress((current / duration) * 100);
+            setCurrentTime(current);
+
+            // Manual Loop Logic for Local Video
+            if (current >= clip.endTime) {
+                videoRef.current.currentTime = clip.startTime;
+                videoRef.current.play();
+                return;
+            }
+
+            // Relative Progress Calculation
+            const clipDuration = clip.endTime - clip.startTime;
+            const relativeTime = current - clip.startTime;
+            const pct = Math.max(0, Math.min(100, (relativeTime / clipDuration) * 100));
+            setProgress(pct);
         }
+    };
+
+    // Find active caption
+    const activeCaption = useMemo(() => {
+        if (!clip?.transcript) return null;
+        // Adjust for relative time if transcript timestamps are relative to clip start
+        // Actually, Virality engine returns segments with relative to 0 of the *clip* usually? 
+        // Let's check actions.ts: "start: Number((c.start + currentOutputTime).toFixed(2))" essentially relative to generated clip?
+        // Wait, for *previewing* raw source video, the transcript segments should match the source timestamps (startTime + offset).
+        // Let's look at actions.ts: "formattedTranscript" in getViralHooks maps s.start directly from fetchCaptions?
+        // fetchCaptions returns "start: word.start - startTime".
+        // So `clip.transcript` has timestamps RELATIVE TO CLIP START (0...duration).
+
+        // If playing Local Source Video (raw url), current is Absolute Time (e.g. 120s).
+        // Clip starts at 120s. Transcript says "0.5s".
+        // So we need to match: (currentTime - clip.startTime) vs (caption.timestamp string converted to sec?)
+        // Wait, `clip.transcript` is { timestamp: "MM:SS", text: "..." }. This is purely display?
+        // Let's check `Clip` type definition to see if we have raw segments.
+        // `segments` field has raw data? "segments: hook.segments" (which are absolute ranges).
+        // But we need individual words/sentences for captioning.
+
+        // RE-READ actions.ts getViralHooks:
+        // formattedTranscript = transcriptSegments.map(s => ({ timestamp: formatDuration(s.start), text: s.text }))
+        // transcriptSegments comes from fetchCaptions which shifts start by `- startTime`.
+        // So formattedTranscript is RELATIVE to clip start.
+
+        // Display logic:
+        // currentRelTime = currentTime - clip.startTime.
+        // We need to parse "MM:SS" back to seconds to compare? efficient.
+        // Better to use `rawTranscript` if we had it, but we only have `transcript` prop which is text based?
+        // Actually `segments` prop on Clip might be useful? No, that's just the cut list.
+
+        // Let's parse the timestamp from formattedTranscript
+        const relTime = currentTime - (clip?.startTime || 0);
+
+        return clip?.transcript?.find(t => {
+            const [m, s] = t.timestamp.split(':').map(Number);
+            const timeStart = m * 60 + s;
+            // Assumption: Each segment lasts until next one? or arbitrary duration?
+            // fetchCaptions uses 2-3 word chunks.
+            // Let's assume a 2 second window or find the one strictly current.
+            // Since we don't have 'end' in formattedTranscript, detailed captioning is hard.
+            // BUT: `transcript_segment` in DB has json?
+
+            // Allow 1.5s window for now as fallback
+            return relTime >= timeStart && relTime < timeStart + 2;
+        });
+    }, [currentTime, clip]);
+
+    const formatTime = (seconds: number) => {
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
     return (
@@ -79,18 +149,14 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                     allowFullScreen
                                 />
-                                {/* Overlay to intercept clicks for custom controls if needed, 
-                                    but implementing full YouTube API is complex. 
-                                    For now, let's keep it simple: if paused, render overlay. 
-                                */}
                             </div>
                         ) : (
                             <video
                                 ref={videoRef}
                                 className="w-full h-full object-cover"
-                                src={clip.url} // Local file URL
-                                loop
+                                src={clip.url}
                                 playsInline
+                                // No 'loop' attribute on the tag itself, we handle it manually
                                 autoPlay
                                 onTimeUpdate={handleTimeUpdate}
                                 onClick={togglePlay}
@@ -98,35 +164,26 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
                         )}
                     </motion.div>
                 ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900 text-zinc-500 space-y-4">
-                        <div className="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center animate-pulse">
-                            <Play className="w-8 h-8 opacity-20" />
-                        </div>
-                        <p className="text-sm font-medium">Select a clip to preview</p>
-                    </div>
+                    /* Removed static placeholder */
+                    null
                 )}
             </AnimatePresence>
 
-            {/* Caption Overlay Area (Mock - Only show for local video or specific condition) */}
-            {clip && !isYouTube && (
-                <div className="absolute bottom-32 left-8 right-8 text-center pointer-events-none z-10">
+            {/* Dynamic Caption Overlay */}
+            {clip && !isYouTube && activeCaption && (
+                <div className="absolute bottom-24 left-4 right-4 text-center pointer-events-none z-10 flex flex-col items-center justify-end h-32">
                     <motion.div
-                        initial={{ scale: 0.8, opacity: 0, rotate: -5 }}
-                        animate={{ scale: 1, opacity: 1, rotate: -2 }}
-                        transition={{ delay: 0.5, type: 'spring' }}
+                        key={activeCaption.timestamp} // Animate change
+                        initial={{ y: 10, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        className="bg-black/60 backdrop-blur-sm text-yellow-400 px-3 py-1.5 rounded-lg text-lg font-bold shadow-lg border border-yellow-400/20"
                     >
-                        <span className="bg-yellow-400 text-black px-2 py-1 text-2xl font-bold uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] border-2 border-black inline-block">
-                            Viral
-                        </span>
-                        <br />
-                        <span className="text-white text-3xl font-black drop-shadow-[0_2px_0px_rgba(0,0,0,1)] stroke-black" style={{ WebkitTextStroke: '1px black' }}>
-                            MOMENTS
-                        </span>
+                        {activeCaption.text}
                     </motion.div>
                 </div>
             )}
 
-            {/* Custom Controls - Hidden for YouTube for now to avoid conflict/complexity */}
+            {/* Custom Controls - Modified for better UX */}
             {!isYouTube && (
                 <div className={cn(
                     "absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/90 via-black/50 to-transparent pt-12 transition-opacity duration-300 z-20",
@@ -134,7 +191,8 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
                 )}>
                     <div className="flex items-center justify-between mb-4">
                         <span className="text-xs font-mono text-white/80">
-                            {clip && isYouTube ? `${Math.floor(clip.startTime)}s` : "00:00"}
+                            {/* Show relative time */}
+                            {clip ? formatTime(Math.max(0, currentTime - clip.startTime)) : "00:00"}
                             /
                             {clip ? clip.duration : "00:00"}
                         </span>
@@ -154,10 +212,8 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
                     {/* Main Controls */}
                     <div className="flex items-center justify-between px-4">
                         <Volume2 className="w-5 h-5 text-white/50 hover:text-white cursor-pointer" />
-
                         <div className="flex items-center gap-6">
                             <SkipBack className="w-6 h-6 text-white hover:text-primary transition-colors cursor-pointer active:scale-90" />
-
                             <button
                                 onClick={togglePlay}
                                 className="w-14 h-14 rounded-full bg-white flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-lg shadow-white/10"
@@ -168,11 +224,9 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
                                     <Play className="w-6 h-6 text-black fill-current ml-1" />
                                 )}
                             </button>
-
                             <SkipForward className="w-6 h-6 text-white hover:text-primary transition-colors cursor-pointer active:scale-90" />
                         </div>
-
-                        <div className="w-5" /> {/* Spacer for symmetry */}
+                        <div className="w-5" />
                     </div>
                 </div>
             )}
