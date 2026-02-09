@@ -61,9 +61,12 @@ def update_job_status(
 
 def process_video(job: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Main video processing pipeline
-    TODO: Implement actual video processing logic
+    Main video processing pipeline (Phase 2 - FULL IMPLEMENTATION)
     """
+    from modules.video_downloader import download_and_extract_all
+    from modules.ai_analyzer import analyze_transcript
+    from modules.video_renderer import render_clip, RenderConfig
+    
     job_id = job["id"]
     video_url = job["video_url"]
     settings = job.get("settings", {})
@@ -71,29 +74,156 @@ def process_video(job: Dict[str, Any]) -> Dict[str, Any]:
     print(f"[Worker] Processing video: {video_url}")
     print(f"[Worker] Settings: {settings}")
     
-    # TODO Phase 2: Implement actual processing
-    # 1. Download video with yt-dlp
-    # 2. Extract transcript
-    # 3. Analyze with Gemini (multimodal)
-    # 4. Detect faces with MediaPipe
-    # 5. Generate clips with FFmpeg
-    # 6. Upload to Cloudflare R2
-    # 7. Return result URLs
+    temp_dir = f"/tmp/{job_id}"
+    os.makedirs(temp_dir, exist_ok=True)
     
-    # For now, simulate processing
-    time.sleep(2)
-    
-    return {
-        "job_id": job_id,
-        "clips": [
-            {
-                "title": "Mock Clip 1",
-                "url": f"https://example.com/clips/{job_id}_1.mp4",
-                "virality_score": 85,
+    try:
+        # Update status to 'processing'
+        update_job_status(job_id, "processing")
+        
+        # Step 1: Download video and extract transcript
+        print(f"[Worker] [1/4] Downloading video...")
+        video_file = download_and_extract_all(video_url, temp_dir)
+        print(f"[Worker] ✅ Downloaded: {video_file.metadata.title}")
+        print(f"[Worker] ✅ Duration: {video_file.metadata.duration}s")
+        print(f"[Worker] ✅ Transcript: {len(video_file.transcript)} characters")
+        
+        # Step 2: AI Analysis for viral hooks
+        print(f"[Worker] [2/4] Analyzing with Gemini...")
+        hooks = analyze_transcript(video_file.transcript)
+        print(f"[Worker] ✅ Found {len(hooks)} viral hooks")
+        
+        # Step 3: Render clips
+        print(f"[Worker] [3/4] Rendering {len(hooks)} clips...")
+        clips = []
+        render_config = RenderConfig(
+            output_width=settings.get('width', 1080),
+            output_height=settings.get('height', 1920),
+            preset='fast',
+            crf=23
+        )
+        
+        for i, hook in enumerate(hooks[:3]):  # Top 3 clips
+            print(f"[Worker]   Rendering clip {i+1}/{min(len(hooks), 3)}...")
+            
+            output_path = os.path.join(temp_dir, f"clip_{i}.mp4")
+            
+            # Render with segment merging if needed
+            if len(hook.segments) > 1:
+                segments = [{"start": seg.start, "end": seg.end} for seg in hook.segments]
+                render_clip(
+                    input_video=video_file.file_path,
+                    output_path=output_path,
+                    start_time=hook.start_time,
+                    end_time=hook.end_time,
+                    segments=segments,
+                    config=render_config
+                )
+            else:
+                # Single segment clip
+                render_clip(
+                    input_video=video_file.file_path,
+                    output_path=output_path,
+                    start_time=hook.start_time,
+                    end_time=hook.end_time,
+                    config=render_config
+                )
+            
+            # Format clip for frontend (matching Clip type)
+            clips.append({
+                "id": f"{job_id}_clip_{i}",
+                "title": hook.type,
+                "url": f"file://{os.path.abspath(output_path)}",  # TODO: Replace with R2 URL in Phase 3
+                "virality_score": hook.virality_score,
+                "start_time": hook.start_time,
+                "end_time": hook.end_time,
+                "segments": [{"start": seg.start, "end": seg.end} for seg in hook.segments],
+                "transcript_segments": []  # TODO: Add transcript matching in Phase 3
+            })
+            
+            print(f"[Worker]   ✅ Clip {i+1}: {hook.type} (score: {hook.virality_score})")
+        
+        print(f"[Worker] [4/4] Saving results to Supabase...")
+        
+        # Prepare result data
+        result_data = {
+            "clips": clips,
+            "metadata": {
+                "title": video_file.metadata.title,
+                "duration": video_file.metadata.duration,
+                "hooks_found": len(hooks)
             }
-        ],
-        "status": "completed"
-    }
+        }
+        
+        # Update job with completed status and results
+        update_job_with_result(job_id, result_data)
+        
+        print(f"[Worker] ✅ Job completed successfully!")
+        
+        return {
+            "job_id": job_id,
+            "clips": clips,
+            "status": "completed",
+            "metadata": result_data["metadata"]
+        }
+        
+    except Exception as e:
+        print(f"[Worker] ❌ Processing error: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Update job status to failed
+        update_job_failed(job_id, str(e))
+        raise e
+    
+    finally:
+        # Cleanup: optionally delete temp files (keep for Phase 2 testing)
+        pass  # Don't delete in Phase 2 for debugging
+
+
+def update_job_status(job_id: str, status: str) -> None:
+    """Update job status in Supabase"""
+    try:
+        result = supabase.table("jobs").update({
+            "status": status,
+            "updated_at": "now()"
+        }).eq("id", job_id).execute()
+        
+        if result.data:
+            print(f"[Worker] Updated job {job_id} status to: {status}")
+    except Exception as e:
+        print(f"[Worker] Failed to update job status: {e}")
+
+
+def update_job_with_result(job_id: str, result_data: Dict[str, Any]) -> None:
+    """Update job with completed status and result data"""
+    try:
+        result = supabase.table("jobs").update({
+            "status": "completed",
+            "result_data": result_data,
+            "updated_at": "now()"
+        }).eq("id", job_id).execute()
+        
+        if result.data:
+            print(f"[Worker] Saved result data for job {job_id}")
+    except Exception as e:
+        print(f"[Worker] Failed to save result data: {e}")
+        raise e
+
+
+def update_job_failed(job_id: str, error_message: str) -> None:
+    """Update job with failed status and error message"""
+    try:
+        result = supabase.table("jobs").update({
+            "status": "failed",
+            "error": error_message,
+            "updated_at": "now()"
+        }).eq("id", job_id).execute()
+        
+        if result.data:
+            print(f"[Worker] Marked job {job_id} as failed")
+    except Exception as e:
+        print(f"[Worker] Failed to update job failure: {e}")
 
 
 def handle_job(job_data: str) -> bool:

@@ -1,19 +1,20 @@
-# Python Worker Dependencies
-# Install with: pip install -r requirements.txt
+# Python Worker Module Dependencies
 
-# Core dependencies
+# Core worker dependencies
 redis>=5.0.0
 supabase>=2.0.0
 python-dotenv>=1.0.0
 
-# Video processing (will be used in Phase 2)
+# Phase 2: Video Processing
 yt-dlp>=2024.0.0
 ffmpeg-python>=0.2.0
+requests>=2.31.0
 
-# AI/ML (Phase 2)
+# Phase 2: AI/ML
 google-generativeai>=0.3.0
-# mediapipe>=0.10.0  # Uncomment when implementing face detection
-# opencv-python>=4.8.0  # Uncomment when implementing face detection
+mediapipe>=0.10.0
+opencv-python>=4.8.0
+numpy>=1.24.0
 
 # Type checking
 mypy>=1.0.0

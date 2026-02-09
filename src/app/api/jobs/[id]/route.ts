@@ -44,13 +44,14 @@ export async function GET(
             );
         }
 
-        // Return minimal status info
+        // Return job status with result_data
         return NextResponse.json({
             id: job.id,
             status: job.status,
             created_at: job.created_at,
             updated_at: job.updated_at,
-            result_url: job.result_url || null,
+            result_data: job.result_data || null, // Return processed clips when complete
+            result_url: job.result_url || null, // Legacy field
             error: job.error || null,
             settings: job.settings || null,
         });

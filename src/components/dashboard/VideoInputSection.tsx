@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Youtube, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getVideoTitle, getViralHooks } from '@/lib/video/actions';
+import { useJobPolling } from '@/hooks/useJobPolling';
 import { Clip } from '@/lib/video/types';
 
 interface VideoInputSectionProps {
@@ -16,6 +16,33 @@ export function VideoInputSection({ onVideoFound, isLoading = false }: VideoInpu
     const [localLoading, setLocalLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [statusMessage, setStatusMessage] = useState<string>("");
+    const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+
+    // Use job polling hook
+    const { status: jobStatus, data: jobData, error: jobError } = useJobPolling(currentJobId);
+
+    // Handle job completion
+    useEffect(() => {
+        if (jobStatus === 'completed' && jobData?.result_data) {
+            setStatusMessage("Processing complete!");
+            setLocalLoading(false);
+
+            // Extract clips from result
+            const { clips, metadata } = jobData.result_data;
+            onVideoFound(url, metadata.title, clips);
+
+            // Reset job tracking
+            setCurrentJobId(null);
+        } else if (jobStatus === 'failed') {
+            setError(jobError || 'Job failed');
+            setLocalLoading(false);
+            setCurrentJobId(null);
+        } else if (jobStatus === 'processing') {
+            setStatusMessage("Processing video...");
+        } else if (jobStatus === 'queued') {
+            setStatusMessage("Job queued, waiting for worker...");
+        }
+    }, [jobStatus, jobData, jobError, url, onVideoFound]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -23,7 +50,7 @@ export function VideoInputSection({ onVideoFound, isLoading = false }: VideoInpu
 
         setLocalLoading(true);
         setError(null);
-        setStatusMessage("Fetching video metadata...");
+        setStatusMessage("Submitting job...");
 
         try {
             // Basic validation
@@ -31,24 +58,30 @@ export function VideoInputSection({ onVideoFound, isLoading = false }: VideoInpu
                 throw new Error("Please enter a valid YouTube URL");
             }
 
-            // 1. Get Title (Fast)
-            const titleResult = await getVideoTitle(url);
-            if (titleResult.error) throw new Error(titleResult.error);
+            // Submit job to async queue
+            const response = await fetch('/api/jobs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    video_url: url,
+                    settings: {
+                        clip_count: 3,
+                        aspect_ratio: '9:16',
+                        width: 1080,
+                        height: 1920
+                    }
+                })
+            });
 
-            setStatusMessage("Analyzing transcript for viral hooks...");
-
-            // 2. Get Viral Hooks (Slow)
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const hooksResult = await getViralHooks(url) as any; // Cast to avoid build type issues for now if actions.ts types aren't fully inferred yet
-            if (hooksResult.error) throw new Error(hooksResult.error);
-
-            if (titleResult.title && hooksResult.clips) {
-                setStatusMessage("Finalizing...");
-                onVideoFound(url, titleResult.title, hooksResult.clips);
-                setLocalLoading(false);
-            } else {
-                throw new Error("Could not analyze video");
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to submit job');
             }
+
+            const { job_id } = await response.json();
+
+            setStatusMessage("Job submitted! Starting processing...");
+            setCurrentJobId(job_id); // This triggers the polling hook
 
         } catch (err: any) {
             setError(err.message || "Something went wrong");
