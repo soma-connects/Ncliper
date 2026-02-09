@@ -1,0 +1,22 @@
+# Python Requirements for FFmpeg Face Tracking Module
+# Install with: pip install -r requirements.txt
+
+# Core video processing
+ffmpeg-python>=0.2.0
+
+# Optional dependencies for face detection integration
+# Uncomment based on your face detection method:
+
+# For MediaPipe face detection:
+# mediapipe>=0.10.0
+# opencv-python>=4.8.0
+
+# For OpenCV-based detection:
+# opencv-python>=4.8.0
+
+# For deep learning face detection:
+# torch>=2.0.0
+# torchvision>=0.15.0
+
+# Type checking (development)
+# mypy>=1.0.0
