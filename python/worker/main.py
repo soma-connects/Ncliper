@@ -82,19 +82,40 @@ def process_video(job: Dict[str, Any]) -> Dict[str, Any]:
         update_job_status(job_id, "processing")
         
         # Step 1: Download video and extract transcript
-        print(f"[Worker] [1/4] Downloading video...")
+        print(f"[Worker] [1/5] Downloading video...")
         video_file = download_and_extract_all(video_url, temp_dir)
         print(f"[Worker] ✅ Downloaded: {video_file.metadata.title}")
         print(f"[Worker] ✅ Duration: {video_file.metadata.duration}s")
         print(f"[Worker] ✅ Transcript: {len(video_file.transcript)} characters")
         
-        # Step 2: AI Analysis for viral hooks
-        print(f"[Worker] [2/4] Analyzing with Gemini...")
+        # Step 2: Face Detection (optional, for smart cropping)
+        from modules.face_detector import should_use_face_tracking, detect_faces_simple, generate_crop_filter
+        from modules.video_renderer import get_video_info
+        
+        crop_filter = None
+        if should_use_face_tracking(video_file.metadata.__dict__):
+            print(f"[Worker] [2/5] Detecting faces for smart cropping...")
+            video_info = get_video_info(video_file.file_path)
+            crop_params = detect_faces_simple(
+                video_file.file_path,
+                video_info['width'],
+                video_info['height']
+            )
+            if crop_params:
+                crop_filter = generate_crop_filter(crop_params, video_info['width'], video_info['height'])
+                print(f"[Worker] ✅ Using face-tracking crop")
+            else:
+                print(f"[Worker] ℹ️  No faces detected, will use center crop")
+        else:
+            print(f"[Worker] [2/5] Skipping face detection (video too long)")
+        
+        # Step 3: AI Analysis for viral hooks
+        print(f"[Worker] [3/5] Analyzing with Gemini...")
         hooks = analyze_transcript(video_file.transcript)
         print(f"[Worker] ✅ Found {len(hooks)} viral hooks")
         
-        # Step 3: Render clips
-        print(f"[Worker] [3/4] Rendering {len(hooks)} clips...")
+        # Step 4: Render clips
+        print(f"[Worker] [4/5] Rendering {len(hooks)} clips...")
         clips = []
         render_config = RenderConfig(
             output_width=settings.get('width', 1080),
@@ -117,6 +138,7 @@ def process_video(job: Dict[str, Any]) -> Dict[str, Any]:
                     start_time=hook.start_time,
                     end_time=hook.end_time,
                     segments=segments,
+                    crop_filter=crop_filter,
                     config=render_config
                 )
             else:
@@ -126,14 +148,31 @@ def process_video(job: Dict[str, Any]) -> Dict[str, Any]:
                     output_path=output_path,
                     start_time=hook.start_time,
                     end_time=hook.end_time,
+                    crop_filter=crop_filter,
                     config=render_config
                 )
+            
+            # Upload clip to R2
+            from modules.storage import R2Storage
+            try:
+                storage = R2Storage()
+                print(f"[Worker]   Uploading clip {i+1} to R2...")
+                public_url = storage.upload_clip(output_path, job_id, i)
+                
+                # Delete local file after successful upload
+                os.remove(output_path)
+                
+                clip_url = public_url
+            except Exception as e:
+                print(f"[Worker]   ⚠️  R2 upload failed: {e}")
+                print(f"[Worker]   Falling back to local file")
+                clip_url = f"file://{os.path.abspath(output_path)}"
             
             # Format clip for frontend (matching Clip type)
             clips.append({
                 "id": f"{job_id}_clip_{i}",
                 "title": hook.type,
-                "url": f"file://{os.path.abspath(output_path)}",  # TODO: Replace with R2 URL in Phase 3
+                "url": clip_url,  # Now uses R2 HTTPS URL!
                 "virality_score": hook.virality_score,
                 "start_time": hook.start_time,
                 "end_time": hook.end_time,
@@ -143,7 +182,7 @@ def process_video(job: Dict[str, Any]) -> Dict[str, Any]:
             
             print(f"[Worker]   ✅ Clip {i+1}: {hook.type} (score: {hook.virality_score})")
         
-        print(f"[Worker] [4/4] Saving results to Supabase...")
+        print(f"[Worker] [5/5] Saving results to Supabase...")
         
         # Prepare result data
         result_data = {

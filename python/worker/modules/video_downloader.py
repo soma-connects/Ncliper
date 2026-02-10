@@ -54,6 +54,10 @@ def download_video(url: str, output_dir: str = "/tmp") -> str:
         'quiet': False,
         'no_warnings': False,
         'prefer_ffmpeg': True,
+        # Network resilience options
+        'socket_timeout': 60,  # 60 second socket timeout
+        'retries': 10,  # Retry up to 10 times
+        'fragment_retries': 10,  # Retry fragments
     }
     
     try:

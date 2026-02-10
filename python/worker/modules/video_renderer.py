@@ -160,10 +160,10 @@ def render_clip(
             f"[0:v]{crop_filter},scale={config.output_width}:{config.output_height}[v]",
             '-map', '[v]',
             '-map', '0:a',  # Copy audio
-            '-c:v', config.video_codec,
+            '-c:v', config.codec,
             '-preset', config.preset,
             '-crf', str(config.crf),
-            '-c:a', config.audio_codec,
+            '-c:a', 'aac',
             '-b:a', '128k',
             output_path
         ]
@@ -223,10 +223,10 @@ def render_merged_segments(
                 f"[0:v]{crop_filter},scale={config.output_width}:{config.output_height}[v]",
                 '-map', '[v]',
                 '-map', '0:a',
-                '-c:v', config.video_codec,
+                '-c:v', config.codec,
                 '-preset', config.preset,
                 '-crf', str(config.crf),
-                '-c:a', config.audio_codec,
+                '-c:a', 'aac',
                 temp_file
             ]
             
