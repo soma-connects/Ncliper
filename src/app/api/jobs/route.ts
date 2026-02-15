@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
-import { enqueueVideoJob, type VideoJob } from '@/lib/queue/redis';
+import { invokeModalWorker } from '@/lib/worker/modal';
 import { Database } from '@/lib/supabase/types';
-
-type JobInsert = Database['public']['Tables']['jobs']['Insert'];
 
 /**
  * POST /api/jobs
@@ -54,7 +52,7 @@ export async function POST(req: NextRequest) {
         // }
 
         // 4. Create job record in database
-        const jobInsert: JobInsert = {
+        const jobInsert: Database['public']['Tables']['jobs']['Insert'] = {
             user_id: userId,
             video_url,
             status: 'queued',
@@ -63,7 +61,7 @@ export async function POST(req: NextRequest) {
 
         const { data: jobRecord, error: dbError } = await supabaseAdmin
             .from('jobs')
-            .insert(jobInsert)
+            .insert(jobInsert as any) // Type assertion: table exists but TS cache needs refresh
             .select()
             .single();
 
@@ -75,22 +73,65 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // 5. Enqueue job to Redis
-        const queueJob: VideoJob = {
-            id: jobRecord.id,
-            user_id: userId,
-            video_url,
-            settings: settings || undefined,
-            created_at: new Date().toISOString(),
-            retry_count: 0,
-        };
+        // 5. Hybrid Worker Pipeline (Async)
+        // We run the download/upload locally to use residential IP, then invoke Modal
+        (async () => {
+            try {
+                console.log(`[API] Starting Hybrid Pipeline for job ${(jobRecord as any).id}`);
 
-        await enqueueVideoJob(queueJob);
+                // Import dynamically to avoid top-level await issues if any
+                const { downloadVideoLocally, uploadToR2 } = await import('@/lib/video-downloader');
+
+                // 5a. Local Download (Bypasses YouTube blocking)
+                console.log('[API] Step 1: Downloading locally...');
+                const filePath = await downloadVideoLocally(video_url, (jobRecord as any).id);
+
+                // 5b. Upload to R2
+                console.log('[API] Step 2: Uploading to R2...');
+                const r2Key = `raw/${(jobRecord as any).id}.mp4`;
+                const r2Url = await uploadToR2(filePath, r2Key);
+                console.log(`[API] R2 URL: ${r2Url}`);
+
+                // 5c. Invoke Modal with R2 URL
+                console.log('[API] Step 3: Invoking Modal Worker...');
+                const modalParams = {
+                    job_id: (jobRecord as any).id,
+                    project_id: (jobRecord as any).settings?.project_id || '',
+                    video_url, // Keep original URL for metadata
+                    settings: {
+                        width: settings?.aspect_ratio === '1:1' ? 1080 : 1080,
+                        height: settings?.aspect_ratio === '16:9' ? 1080 : 1920,
+                        clip_count: settings?.clip_count || 3,
+                        download_url: r2Url, // Pass the R2 URL
+                    },
+                };
+
+                await invokeModalWorker(modalParams);
+                console.log('[API] Modal invocation successful');
+
+                // Clean up temp file
+                const fs = await import('fs');
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+
+            } catch (error: any) {
+                console.error('[API] Hybrid Pipeline failed:', error);
+                // Update job status to failed
+                await supabaseAdmin
+                    .from('jobs')
+                    .update({
+                        status: 'failed',
+                        error: error.message || 'Pipeline failed'
+                    } as any)
+                    .eq('id', (jobRecord as any).id);
+            }
+        })();
 
         // 6. Return job ID immediately (202 Accepted - processing async)
         return NextResponse.json(
             {
-                job_id: jobRecord.id,
+                job_id: (jobRecord as any).id,
                 status: 'queued',
                 message: 'Job queued successfully. Poll /api/jobs/{id} for status.',
             },

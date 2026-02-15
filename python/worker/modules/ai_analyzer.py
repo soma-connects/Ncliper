@@ -241,12 +241,121 @@ Return ONLY a JSON array following the requested schema. Ensure `segments` conta
                 type=hook_dict["type"]
             ))
         
+        
         print(f"[AI] Found {len(hooks)} viral hooks")
         return hooks
         
     except Exception as e:
         print(f"[AI] Virality Engine Error: {e}")
         raise Exception(f"Failed to analyze transcript: {str(e)}")
+
+
+def upload_video_for_analysis(video_path: str):
+    """
+    Upload video to Google AI Studio for multimodal analysis
+    """
+    if not API_KEY:
+        print("[AI] No API Key, skipping upload.")
+        return None
+        
+    print(f"[AI] Uploading video {video_path} to Gemini...")
+    video_file = genai.upload_file(path=video_path)
+    print(f"[AI] Upload complete: {video_file.name}")
+    
+    # Poll for processing completion
+    while video_file.state.name == "PROCESSING":
+        print("[AI] Waiting for video processing...", end=' ', flush=True)
+        time.sleep(5)
+        video_file = genai.get_file(video_file.name)
+    
+    if video_file.state.name == "FAILED":
+        raise Exception("Video processing failed in Gemini")
+        
+    print(f"\n[AI] Video is active and ready for analysis.")
+    return video_file
+
+
+def analyze_video(video_path: str, transcript: str = "") -> List[ViralHook]:
+    """
+    Analyze video VISUALLY with Gemini 1.5 Pro
+    Falls back to transcript-only if upload fails
+    """
+    if not API_KEY:
+        return analyze_transcript(transcript)
+
+    try:
+        # 1. Upload Video
+        video_file = upload_video_for_analysis(video_path)
+        if not video_file:
+            return analyze_transcript(transcript)
+
+        # 2. Prepare Multimodal Prompt
+        prompt = """
+You are a Viral Content Strategist. Watch this video and identify exactly 3 viral segments associated with the provided transcript.
+
+**ANALYSIS GOAL:**
+Find moments where the VISUAL action matches the AUDIO hook. 
+- Look for: Facial expressions, physical action, scene changes, on-screen text.
+- Avoid: Static talking heads with no emotion.
+
+**VIRALITY RUBRIC (Scoring 0-100):**
+1. **Visual Hook (40%)**: Does something happen on screen?
+2. **Audio Hook (30%)**: Is the sentence gripping?
+3. **Pacing (30%)**: Is there movement/energy?
+
+**OUTPUT FORMAT:**
+Return strict JSON array of hooks (same schema as before).
+Ensure timestamps are accurate to what you SEE and HEAR.
+"""
+        # 3. Call Gemini 1.5 Pro
+        model_name = "gemini-1.5-pro-latest"
+        print(f"[AI] Analyzing video with {model_name}...")
+        
+        model = genai.GenerativeModel(
+            model_name=model_name,
+            generation_config={
+                "response_mime_type": "application/json",
+                "response_schema": HOOK_SCHEMA,
+            }
+        )
+        
+        # Pass both video file and prompt
+        response = model.generate_content(
+            [video_file, prompt],
+            request_options={"timeout": 600}
+        )
+        
+        # 4. Parse Response
+        hooks_data = json.loads(response.text)
+        
+        hooks = []
+        for hook_dict in hooks_data:
+            segments = [
+                ViralSegment(start=seg["start"], end=seg["end"]) 
+                for seg in hook_dict["segments"]
+            ]
+            
+            hooks.append(ViralHook(
+                start_time=hook_dict["start_time"],
+                end_time=hook_dict["end_time"],
+                segments=segments,
+                virality_score=hook_dict["virality_score"],
+                type=hook_dict.get("type", "Visual Hook")
+            ))
+            
+        print(f"[AI] Found {len(hooks)} multimodal hooks!")
+        
+        # Cleanup
+        print(f"[AI] Deleting remote file {video_file.name}")
+        genai.delete_file(video_file.name)
+        
+        return hooks
+
+    except Exception as e:
+        print(f"[AI] Multimodal analysis failed: {e}")
+        print("[AI] Falling back to transcript-only analysis...")
+        return analyze_transcript(transcript)
+
 
 
 # Test function

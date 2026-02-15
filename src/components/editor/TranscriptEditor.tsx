@@ -12,9 +12,13 @@ export function TranscriptEditor({ transcript: initialTranscript = [] }: Transcr
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const [currentTime, setCurrentTime] = useState(0); // This would be synced with player in a real app
 
+    // Only update when transcript actually changes (deep comparison)
     useEffect(() => {
-        setTranscript(initialTranscript);
-    }, [initialTranscript]);
+        const transcriptChanged = JSON.stringify(transcript) !== JSON.stringify(initialTranscript);
+        if (transcriptChanged) {
+            setTranscript(initialTranscript);
+        }
+    }, [JSON.stringify(initialTranscript)]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleTextChange = (index: number, newText: string) => {
         const newTranscript = [...transcript];

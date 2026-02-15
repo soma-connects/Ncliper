@@ -1,8 +1,17 @@
+'use client';
+
 import { Bell, Search, ChevronDown, Sparkles } from "lucide-react";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
 
 export function Topbar() {
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     return (
         <header className="h-20 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-40 flex items-center justify-between px-8 pl-72 transition-all duration-300">
 
@@ -39,25 +48,31 @@ export function Topbar() {
                 </button>
 
                 <div className="flex items-center gap-3 pl-2">
-                    <SignedIn>
-                        <UserButton
-                            appearance={{
-                                elements: {
-                                    avatarBox: "w-8 h-8 rounded-full border-2 border-background shadow-lg"
-                                }
-                            }}
-                        />
-                        <div className="hidden md:flex flex-col items-start gap-0.5">
-                            <span className="text-xs font-semibold text-white">
-                                <span className="opacity-70">Welcome back</span>
-                            </span>
-                            <span className="text-[10px] text-muted-foreground">Free Plan</span>
-                        </div>
-                    </SignedIn>
-                    <SignedOut>
-                        {/* This helps avoids layout shift or provides a fallback if needed */}
+                    {mounted ? (
+                        <>
+                            <SignedIn>
+                                <UserButton
+                                    appearance={{
+                                        elements: {
+                                            avatarBox: "w-8 h-8 rounded-full border-2 border-background shadow-lg"
+                                        }
+                                    }}
+                                />
+                                <div className="hidden md:flex flex-col items-start gap-0.5">
+                                    <span className="text-xs font-semibold text-white">
+                                        <span className="opacity-70">Welcome back</span>
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground">Free Plan</span>
+                                </div>
+                            </SignedIn>
+                            <SignedOut>
+                                {/* This helps avoids layout shift or provides a fallback if needed */}
+                                <div className="w-8 h-8 rounded-full bg-secondary animate-pulse" />
+                            </SignedOut>
+                        </>
+                    ) : (
                         <div className="w-8 h-8 rounded-full bg-secondary animate-pulse" />
-                    </SignedOut>
+                    )}
                 </div>
             </div>
         </header>

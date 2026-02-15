@@ -10,7 +10,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { data, error } = await supabase
+        const { data: rawData, error } = await supabase
             .from('clips')
             .select('*')
             .eq('project_id', params.id)
@@ -18,14 +18,21 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
 
         if (error) throw error;
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = rawData as any[];
+
         // Transform if needed to match frontend Clip interface
         const formattedClips = data.map(clip => ({
             id: clip.id,
             title: clip.title,
             score: clip.virality_score || 0,
-            duration: `${Math.floor((clip.end_time - clip.start_time))}s`, // Simple formatting
+            duration: `${Math.floor((clip.end_time - clip.start_time))}s`,
             url: clip.video_url,
-            thumbnailUrl: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800&q=80", // Placeholder for now
+            videoId: clip.video_url.split('/').pop()?.split('.')[0] || 'generated', // Fallback ID
+            thumbnailUrl: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800&q=80",
+            startTime: clip.start_time,
+            endTime: clip.end_time,
+            segments: [{ start: clip.start_time, end: clip.end_time }],
             transcript: clip.transcript_segment || []
         }));
 

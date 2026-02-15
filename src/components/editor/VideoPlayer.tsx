@@ -17,8 +17,11 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [progress, setProgress] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
+    const [loadError, setLoadError] = useState(false);
 
+    // Detect video source type
     const isYouTube = clip?.url?.includes('youtube.com') || clip?.url?.includes('youtu.be');
+    const isR2 = clip?.url?.includes('.r2.dev') || clip?.url?.startsWith('https://');
 
     // YouTube Embed: Use simpler integers but try to respect bounds
     // Note: YouTube 'end' param stops playback. It does not loop automatically.
@@ -34,15 +37,29 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
             setIsPlaying(true);
             setProgress(0);
             setCurrentTime(clip.startTime);
-            // If local video, seek to start
-            if (videoRef.current) {
-                videoRef.current.currentTime = clip.startTime;
-                videoRef.current.play().catch(() => setIsPlaying(false));
+            setLoadError(false);
+
+            // For R2/HTTPS videos, handle loading
+            if (videoRef.current && !isYouTube) {
+                const video = videoRef.current;
+
+                // For R2 clips (which start at 0), don't seek
+                if (isR2) {
+                    video.currentTime = 0;
+                } else {
+                    // For YouTube source videos, seek to startTime
+                    video.currentTime = clip.startTime;
+                }
+
+                video.play().catch((err) => {
+                    console.log('[VideoPlayer] Autoplay failed:', err);
+                    setIsPlaying(false);
+                });
             }
         } else {
             setIsPlaying(false);
         }
-    }, [clip]);
+    }, [clip, isYouTube, isR2]);
 
     const togglePlay = () => {
         setIsPlaying(!isPlaying);
@@ -60,18 +77,32 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
             const current = videoRef.current.currentTime;
             setCurrentTime(current);
 
-            // Manual Loop Logic for Local Video
-            if (current >= clip.endTime) {
-                videoRef.current.currentTime = clip.startTime;
-                videoRef.current.play();
-                return;
-            }
+            // Manual Loop Logic - Different for R2 vs Source Videos
+            if (isR2) {
+                // R2 clips are pre-rendered segments starting at 0
+                // Just loop from 0 to video duration
+                if (current >= videoRef.current.duration - 0.1) {
+                    videoRef.current.currentTime = 0;
+                    videoRef.current.play();
+                }
 
-            // Relative Progress Calculation
-            const clipDuration = clip.endTime - clip.startTime;
-            const relativeTime = current - clip.startTime;
-            const pct = Math.max(0, Math.min(100, (relativeTime / clipDuration) * 100));
-            setProgress(pct);
+                // Progress based on actual video duration
+                const pct = Math.max(0, Math.min(100, (current / videoRef.current.duration) * 100));
+                setProgress(pct);
+            } else {
+                // Source video - use startTime/endTime for looping
+                if (current >= clip.endTime) {
+                    videoRef.current.currentTime = clip.startTime;
+                    videoRef.current.play();
+                    return;
+                }
+
+                // Relative Progress Calculation
+                const clipDuration = clip.endTime - clip.startTime;
+                const relativeTime = current - clip.startTime;
+                const pct = Math.max(0, Math.min(100, (relativeTime / clipDuration) * 100));
+                setProgress(pct);
+            }
         }
     };
 
@@ -100,13 +131,9 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
         // So formattedTranscript is RELATIVE to clip start.
 
         // Display logic:
-        // currentRelTime = currentTime - clip.startTime.
-        // We need to parse "MM:SS" back to seconds to compare? efficient.
-        // Better to use `rawTranscript` if we had it, but we only have `transcript` prop which is text based?
-        // Actually `segments` prop on Clip might be useful? No, that's just the cut list.
-
-        // Let's parse the timestamp from formattedTranscript
-        const relTime = currentTime - (clip?.startTime || 0);
+        // For R2 clips: currentTime is already relative (0-duration)
+        // For source videos: currentRelTime = currentTime - clip.startTime
+        const relTime = isR2 ? currentTime : currentTime - (clip?.startTime || 0);
 
         return clip?.transcript?.find(t => {
             const [m, s] = t.timestamp.split(':').map(Number);
@@ -120,7 +147,7 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
             // Allow 1.5s window for now as fallback
             return relTime >= timeStart && relTime < timeStart + 2;
         });
-    }, [currentTime, clip]);
+    }, [currentTime, clip, isR2]);
 
     const formatTime = (seconds: number) => {
         const m = Math.floor(seconds / 60);
@@ -191,8 +218,8 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
                 )}>
                     <div className="flex items-center justify-between mb-4">
                         <span className="text-xs font-mono text-white/80">
-                            {/* Show relative time */}
-                            {clip ? formatTime(Math.max(0, currentTime - clip.startTime)) : "00:00"}
+                            {/* Show relative time - for R2 use current, for source use offset */}
+                            {clip ? formatTime(isR2 ? currentTime : Math.max(0, currentTime - clip.startTime)) : "00:00"}
                             /
                             {clip ? clip.duration : "00:00"}
                         </span>

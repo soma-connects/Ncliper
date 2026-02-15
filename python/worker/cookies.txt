@@ -1,0 +1,8 @@
+# Netscape HTTP Cookie File
+# http://curl.haxx.se/rfc/cookie_spec.html
+# This is a generated file!  Do not edit.
+
+#HttpOnly_.youtube.com	TRUE	/	TRUE	1783746628	__Secure-ROLLOUT_TOKEN	CLHn3LKD_cS38gEQpM7so56FkgMYhKz9pZ6FkgM%3D
+#HttpOnly_.youtube.com	TRUE	/	TRUE	1783741297	__Secure-YNID	15.YT=IFUvVEUg2Wk7gOEdB3rICkWS9ndrMF6rnRq2fvPwzYn_1D-Hrj6M-1-ZYy8crae0iKVeuNtArslQUeCshTnYR63hoptnPu4TmJdQiQk1biioCutayEBpo0OFgYOj0hug297cZMK1WCu3J3t_fD0jewq93zynxg-DZCk4orMktQCby2DCtpSFovujpXskGDJQHPk0A26px7GyqOrfuKvbW17GKI29Xh_BtyNq_3_Iam7ApgHKcU6srgJgRneLN4LcF0LEDdIlYlHsPpdk74YJmclmMCp7ACI30d11aSE7DyC6_T421J_qRh_61K4jsY7Kz9deIHVXeJWvfSYs_n99hA
+#HttpOnly_.youtube.com	TRUE	/	TRUE	1783746670	VISITOR_INFO1_LIVE	OUnxR7aJ8GM
+#HttpOnly_.youtube.com	TRUE	/	TRUE	1783746670	VISITOR_PRIVACY_METADATA	CgJORxIEGgAgTA%3D%3D

@@ -41,6 +41,38 @@ export interface Database {
                     metadata?: Json | null
                 }
             }
+            jobs: {
+                Row: {
+                    id: string
+                    created_at: string
+                    user_id: string
+                    video_url: string
+                    status: 'queued' | 'processing' | 'completed' | 'failed'
+                    settings: Json | null
+                    result_data: Json | null
+                    error: string | null
+                }
+                Insert: {
+                    id?: string
+                    created_at?: string
+                    user_id: string
+                    video_url: string
+                    status?: 'queued' | 'processing' | 'completed' | 'failed'
+                    settings?: Json | null
+                    result_data?: Json | null
+                    error?: string | null
+                }
+                Update: {
+                    id?: string
+                    created_at?: string
+                    user_id?: string
+                    video_url?: string
+                    status?: 'queued' | 'processing' | 'completed' | 'failed'
+                    settings?: Json | null
+                    result_data?: Json | null
+                    error?: string | null
+                }
+            }
             clips: {
                 Row: {
                     id: string

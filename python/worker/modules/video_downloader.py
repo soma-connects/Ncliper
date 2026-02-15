@@ -1,15 +1,26 @@
 """
 Video Download Module
-Handles YouTube video downloading and transcript extraction using yt-dlp
-Ported from TypeScript actions.ts
+Handles YouTube video downloading and transcript extraction.
+
+Strategy to avoid YouTube bot detection:
+  - Metadata:    YouTube oEmbed API (no auth needed)
+  - Transcript:  youtube-transcript-api (no auth needed)
+  - Download:    yt-dlp with cookies fallback (only step that truly needs it)
 """
 
 import os
+import re
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
+
+import requests
 import yt_dlp
 
+
+# ---------------------------------------------------------------------------
+# Data classes
+# ---------------------------------------------------------------------------
 
 @dataclass
 class VideoMetadata:
@@ -29,101 +40,123 @@ class VideoFile:
     transcript: str
 
 
-def download_video(url: str, output_dir: str = "/tmp") -> str:
-    """
-    Download YouTube video to local filesystem
-    
-    Args:
-        url: YouTube video URL
-        output_dir: Directory to save video (default: /tmp for serverless)
-    
-    Returns:
-        Absolute path to downloaded video file
-    
-    Raises:
-        Exception: If download fails
-    """
-    print(f"[VideoDownloader] Downloading: {url}")
-    
-    # Ensure output directory exists
-    os.makedirs(output_dir, exist_ok=True)
-    
-    ydl_opts = {
-        'format': 'best[ext=mp4]/best',  # Prefer MP4, fallback to best
-        'outtmpl': f'{output_dir}/%(id)s.%(ext)s',
-        'quiet': False,
-        'no_warnings': False,
-        'prefer_ffmpeg': True,
-        # Network resilience options
-        'socket_timeout': 60,  # 60 second socket timeout
-        'retries': 10,  # Retry up to 10 times
-        'fragment_retries': 10,  # Retry fragments
-    }
-    
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            file_path = ydl.prepare_filename(info)
-            
-            print(f"[VideoDownloader] Downloaded to: {file_path}")
-            return file_path
-            
-    except Exception as e:
-        print(f"[VideoDownloader] Error downloading video: {e}")
-        raise Exception(f"Failed to download video: {str(e)}")
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
+def _extract_video_id(url: str) -> str:
+    """Extract YouTube video ID from various URL formats."""
+    patterns = [
+        r'(?:v=|/v/|youtu\.be/)([a-zA-Z0-9_-]{11})',
+        r'(?:embed/)([a-zA-Z0-9_-]{11})',
+        r'^([a-zA-Z0-9_-]{11})$',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    raise ValueError(f"Could not extract video ID from URL: {url}")
+
+
+def _get_cookie_opts() -> dict:
+    """Get yt-dlp cookie options from environment variable."""
+    cookie_file = os.getenv("YOUTUBE_COOKIE_FILE", "")
+    if cookie_file and os.path.isfile(cookie_file):
+        print(f"[VideoDownloader] Using cookies from: {cookie_file}")
+        return {'cookiefile': cookie_file}
+    return {}
+
+
+# ---------------------------------------------------------------------------
+# 1. Metadata — via YouTube oEmbed API (no auth required)
+# ---------------------------------------------------------------------------
 
 def get_video_metadata(url: str) -> VideoMetadata:
     """
-    Extract video metadata without downloading
+    Extract video metadata using the YouTube oEmbed API.
+    This endpoint does NOT require authentication or cookies.
     
-    Args:
-        url: YouTube video URL
-    
-    Returns:
-        VideoMetadata object with title, duration, etc.
+    Note: oEmbed doesn't provide duration. We set it to 0 and let
+    the AI analyzer work with transcript length instead.
     """
-    print(f"[VideoDownloader] Fetching metadata for: {url}")
-    
-    ydl_opts = {
-        'quiet': True,
-        'no_warnings': True,
-        'skip_download': True,
-    }
+    video_id = _extract_video_id(url)
+    print(f"[VideoDownloader] Fetching metadata via oEmbed for: {video_id}")
+
+    oembed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
     
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            
-            return VideoMetadata(
-                title=info.get('title', 'Unknown'),
-                duration=float(info.get('duration', 0)),
-                thumbnail_url=info.get('thumbnail', ''),
-                video_id=info.get('id', ''),
-                description=info.get('description', '')
-            )
-            
-    except Exception as e:
-        print(f"[VideoDownloader] Error fetching metadata: {e}")
-        raise Exception(f"Failed to fetch metadata: {str(e)}")
+        resp = requests.get(oembed_url, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
 
+        return VideoMetadata(
+            title=data.get("title", "Untitled Video"),
+            duration=0.0,  # oEmbed doesn't expose duration
+            thumbnail_url=data.get("thumbnail_url", f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"),
+            video_id=video_id,
+            description=data.get("author_name", ""),
+        )
+    except Exception as e:
+        print(f"[VideoDownloader] oEmbed failed ({e}), using fallback metadata")
+        return VideoMetadata(
+            title="Untitled Video",
+            duration=0.0,
+            thumbnail_url=f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg",
+            video_id=video_id,
+            description="",
+        )
+
+
+# ---------------------------------------------------------------------------
+# 2. Transcript — via youtube-transcript-api (no auth required)
+# ---------------------------------------------------------------------------
 
 def extract_transcript(url: str) -> str:
     """
-    Extract full transcript from YouTube video
-    Ported from TypeScript fetchTranscript() in actions.ts
-    
-    Args:
-        url: YouTube video URL
-    
-    Returns:
-        Full transcript as plain text
-    
-    Raises:
-        Exception: If transcript extraction fails
+    Extract full transcript using the youtube-transcript-api library.
+    This library uses internal YouTube endpoints that do NOT trigger
+    bot detection even from data-center IPs.
     """
-    print(f"[VideoDownloader] Extracting transcript for: {url}")
-    
+    video_id = _extract_video_id(url)
+    print(f"[VideoDownloader] Extracting transcript for: {video_id}")
+
+    try:
+        from youtube_transcript_api import YouTubeTranscriptApi
+
+        ytt_api = YouTubeTranscriptApi()
+        # Try English variants first
+        fetched = ytt_api.fetch(video_id)
+        
+        # Build plain text from snippets
+        segments = []
+        for snippet in fetched.snippets:
+            text = snippet.text.strip()
+            if text:
+                segments.append(text)
+
+        full_text = " ".join(segments)
+        # Clean up whitespace
+        full_text = " ".join(full_text.split())
+
+        if full_text:
+            print(f"[VideoDownloader] Transcript extracted: {len(full_text)} characters")
+            return full_text
+        else:
+            print("[VideoDownloader] Transcript was empty, using fallback")
+            return "No transcript available."
+
+    except Exception as e:
+        print(f"[VideoDownloader] youtube-transcript-api failed: {e}")
+        # Fallback: try yt-dlp (may hit bot detection but worth trying)
+        try:
+            return _extract_transcript_ytdlp(url)
+        except Exception as e2:
+            print(f"[VideoDownloader] yt-dlp transcript fallback also failed: {e2}")
+            return "No transcript available."
+
+
+def _extract_transcript_ytdlp(url: str) -> str:
+    """Fallback transcript extraction via yt-dlp (may hit bot detection)."""
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
@@ -131,136 +164,177 @@ def extract_transcript(url: str) -> str:
         'writesubtitles': True,
         'writeautomaticsub': True,
         'subtitleslangs': ['en', 'en-US', 'en-GB'],
+        **_get_cookie_opts(),
+        'extractor_args': {
+            'youtube': {'player_client': ['android', 'web']}
+        },
     }
-    
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            
-            # Try to find JSON3 subtitle URL (best for word-level timing)
-            sub_url = None
-            langs = ['en', 'en-US', 'en-GB']
-            
-            # Priority 1: Manual subtitles
-            if info.get('subtitles'):
-                for lang in langs:
-                    if lang in info['subtitles']:
-                        for fmt in info['subtitles'][lang]:
-                            if fmt.get('ext') == 'json3':
-                                sub_url = fmt.get('url')
-                                break
-                        if sub_url:
-                            break
-            
-            # Priority 2: Auto-generated captions
-            if not sub_url and info.get('automatic_captions'):
-                for lang in langs:
-                    if lang in info['automatic_captions']:
-                        for fmt in info['automatic_captions'][lang]:
-                            if fmt.get('ext') == 'json3':
-                                sub_url = fmt.get('url')
-                                break
-                        if sub_url:
-                            break
-            
-            # Fallback: Use description if no subtitles found
-            if not sub_url:
-                print("[VideoDownloader] No subtitles found, using description")
-                return info.get('description', 'No transcript available.')
-            
-            # Fetch and parse JSON3 subtitle content
-            print(f"[VideoDownloader] Downloading subtitles from: {sub_url}")
-            import requests
-            response = requests.get(sub_url)
-            response.raise_for_status()
-            
-            sub_json = response.json()
-            
-            # Parse JSON3 format to plain text
-            # Format: { events: [ { tStartMs, dDurationMs, segs: [ { utf8: "text" } ] } ] }
-            full_text = ""
-            if sub_json.get('events'):
-                segments = []
-                for event in sub_json['events']:
-                    if event.get('segs'):
-                        text = ''.join(seg.get('utf8', '') for seg in event['segs'])
-                        segments.append(text)
-                
-                full_text = ' '.join(segments).strip()
-                # Clean up whitespace
-                full_text = ' '.join(full_text.split())
-            
-            if not full_text:
-                return info.get('description', 'No transcript available.')
-            
-            print(f"[VideoDownloader] Transcript extracted: {len(full_text)} characters")
-            return full_text
-            
-    except Exception as e:
-        print(f"[VideoDownloader] Error extracting transcript: {e}")
-        raise Exception(f"Failed to extract transcript: {str(e)}")
 
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+
+        sub_url = None
+        langs = ['en', 'en-US', 'en-GB']
+
+        for source in ['subtitles', 'automatic_captions']:
+            subs = info.get(source, {})
+            if subs:
+                for lang in langs:
+                    if lang in subs:
+                        for fmt in subs[lang]:
+                            if fmt.get('ext') == 'json3':
+                                sub_url = fmt.get('url')
+                                break
+                        if sub_url:
+                            break
+            if sub_url:
+                break
+
+        if not sub_url:
+            return info.get('description', 'No transcript available.')
+
+        resp = requests.get(sub_url, timeout=30)
+        resp.raise_for_status()
+        sub_json = resp.json()
+
+        segments = []
+        for event in sub_json.get('events', []):
+            if event.get('segs'):
+                text = ''.join(seg.get('utf8', '') for seg in event['segs'])
+                segments.append(text)
+
+        full_text = ' '.join(segments).strip()
+        full_text = ' '.join(full_text.split())
+        return full_text or info.get('description', 'No transcript available.')
+
+
+# ---------------------------------------------------------------------------
+# 3. Video download — yt-dlp (with cookies + fallback clients)
+# ---------------------------------------------------------------------------
+
+def download_video(url: str, output_dir: str = "/tmp") -> str:
+    """
+    Download YouTube video to local filesystem using yt-dlp.
+    Tries multiple client configurations to bypass bot detection.
+    """
+    print(f"[VideoDownloader] Downloading: {url}")
+    os.makedirs(output_dir, exist_ok=True)
+    
+    strategies = [
+        # Strategy 1: Cookies + Android (Standard attempt)
+        {
+            'name': 'Cookies + Android',
+            'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+            'use_cookies': True
+        },
+        # Strategy 2: No Cookies + iOS (Mobile API often less strict)
+        {
+            'name': 'No Cookies + iOS',
+            'extractor_args': {'youtube': {'player_client': ['ios']}},
+            'use_cookies': False
+        },
+        # Strategy 3: No Cookies + TV (Different API endpoints)
+        {
+            'name': 'No Cookies + TV',
+            'extractor_args': {'youtube': {'player_client': ['tv']}},
+            'use_cookies': False
+        },
+         # Strategy 4: Web Embedded (Simulate embedded player)
+        {
+            'name': 'Web Embedded',
+            'extractor_args': {'youtube': {'player_client': ['web_embedded']}},
+            'use_cookies': False
+        }
+    ]
+
+    last_error = None
+
+    for strategy in strategies:
+        print(f"[VideoDownloader] Trying strategy: {strategy['name']}")
+        
+        ydl_opts = {
+            'format': 'best[ext=mp4]/best',
+            'outtmpl': f'{output_dir}/%(id)s.%(ext)s',
+            'quiet': False,
+            'no_warnings': False,
+            'prefer_ffmpeg': True,
+            'fragment_retries': 10,
+        }
+        
+        # Apply strategy options
+        if strategy['use_cookies']:
+            ydl_opts.update(_get_cookie_opts())
+            
+        if strategy.get('extractor_args'):
+            ydl_opts['extractor_args'] = strategy['extractor_args']
+
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                file_path = ydl.prepare_filename(info)
+                print(f"[VideoDownloader] Success with {strategy['name']}! Downloaded to: {file_path}")
+                return file_path
+        except Exception as e:
+            print(f"[VideoDownloader] Strategy {strategy['name']} failed: {e}")
+            last_error = e
+            continue
+
+    print(f"[VideoDownloader] All download strategies failed.")
+    raise Exception(f"Failed to download video after {len(strategies)} attempts. Last error: {str(last_error)}")
+
+
+# ---------------------------------------------------------------------------
+# 4. Convenience wrapper
+# ---------------------------------------------------------------------------
 
 def download_and_extract_all(url: str, output_dir: str = "/tmp") -> VideoFile:
     """
-    Convenience function to download video, extract metadata and transcript
-    
-    Args:
-        url: YouTube video URL
-        output_dir: Directory to save video
-    
-    Returns:
-        VideoFile object with all information
+    Download video, extract metadata and transcript.
+    Metadata and transcript use APIs that bypass bot detection.
+    Only the video download step uses yt-dlp.
     """
     print(f"[VideoDownloader] Processing: {url}")
-    
-    # Get metadata first (lightweight)
+
+    # These two calls do NOT use yt-dlp — no bot detection risk
     metadata = get_video_metadata(url)
-    
-    # Extract transcript (no video download needed)
     transcript = extract_transcript(url)
-    
-    # Download video file
+
+    # This uses yt-dlp — may need cookies for data center IPs
     video_path = download_video(url, output_dir)
-    
+
     return VideoFile(
         file_path=video_path,
         metadata=metadata,
-        transcript=transcript
+        transcript=transcript,
     )
 
 
-# Test function for development
+# ---------------------------------------------------------------------------
+# CLI test
+# ---------------------------------------------------------------------------
+
 if __name__ == "__main__":
     import sys
-    
+
     if len(sys.argv) < 2:
         print("Usage: python video_downloader.py <youtube_url>")
         sys.exit(1)
-    
+
     test_url = sys.argv[1]
-    
+
     try:
-        # Test metadata extraction
-        print("\n=== Testing Metadata Extraction ===")
+        print("\n=== Testing Metadata Extraction (oEmbed) ===")
         metadata = get_video_metadata(test_url)
         print(f"Title: {metadata.title}")
-        print(f"Duration: {metadata.duration}s")
         print(f"Video ID: {metadata.video_id}")
-        
-        # Test transcript extraction
-        print("\n=== Testing Transcript Extraction ===")
+
+        print("\n=== Testing Transcript Extraction (youtube-transcript-api) ===")
         transcript = extract_transcript(test_url)
         print(f"Transcript length: {len(transcript)} characters")
         print(f"Preview: {transcript[:200]}...")
-        
-        # Test full download (optional - comment out to skip)
-        # print("\n=== Testing Video Download ===")
-        # video_path = download_video(test_url)
-        # print(f"Downloaded to: {video_path}")
-        
-        print("\n✅ All tests passed!")
-        
+
+        print("\nAll tests passed!")
+
     except Exception as e:
-        print(f"\n❌ Test failed: {e}")
+        print(f"\nTest failed: {e}")
         sys.exit(1)

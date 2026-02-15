@@ -26,6 +26,20 @@ export default function Home() {
     enabled: !!userId,
   });
 
+  // Fetch clips for active project
+  const { data: projectClips } = useQuery({
+    queryKey: ['clips', activeProjectId],
+    queryFn: async () => {
+      if (!activeProjectId) return [];
+      const res = await fetch(`/api/projects/${activeProjectId}/clips`);
+      if (!res.ok) throw new Error('Failed to fetch clips');
+      const data = await res.json();
+      // API returns the array of clips directly, not wrapped in an object
+      return Array.isArray(data) ? data : (data.clips || []);
+    },
+    enabled: !!activeProjectId,
+  });
+
   // Create project mutation
   const createProjectMutation = useMutation({
     mutationFn: async (vars: { url: string; title: string }) => {
@@ -112,7 +126,7 @@ export default function Home() {
           <EditorView
             projectId={activeProject?.id || 'temp'}
             projectTitle={activeProject?.title || 'New Project'}
-            initialClips={generatedClips}
+            initialClips={projectClips || generatedClips}
           />
         )}
       </div>
