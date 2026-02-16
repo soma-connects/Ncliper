@@ -1,0 +1,59 @@
+{
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "buildCommand": "npm run build",
+    "framework": "nextjs",
+    "installCommand": "npm install",
+    "regions": [
+        "iad1"
+    ],
+    "functions": {
+        "src/app/api/**/*.ts": {
+            "maxDuration": 30
+        }
+    },
+    "headers": [
+        {
+            "source": "/api/(.*)",
+            "headers": [
+                {
+                    "key": "Cache-Control",
+                    "value": "no-store, must-revalidate"
+                }
+            ]
+        }
+    ],
+    "env": {
+        "NEXT_PUBLIC_SUPABASE_URL": {
+            "description": "Supabase project URL",
+            "value": "@supabase_url"
+        },
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY": {
+            "description": "Supabase anonymous key",
+            "value": "@supabase_anon_key"
+        },
+        "SUPABASE_SERVICE_ROLE_KEY": {
+            "description": "Supabase service role key (required for server actions)",
+            "value": "@supabase_service_role_key"
+        },
+        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": {
+            "description": "Clerk publishable key for authentication",
+            "value": "@clerk_publishable_key"
+        },
+        "CLERK_SECRET_KEY": {
+            "description": "Clerk secret key",
+            "value": "@clerk_secret_key"
+        },
+        "GOOGLE_API_KEY": {
+            "description": "Google Gemini API key for AI analysis",
+            "value": "@google_api_key"
+        },
+        "UPSTASH_REDIS_REST_URL": {
+            "description": "Upstash Redis URL for job queue",
+            "value": "@upstash_redis_url"
+        },
+        "UPSTASH_REDIS_REST_TOKEN": {
+            "description": "Upstash Redis token",
+            "value": "@upstash_redis_token"
+        }
+    }
+}

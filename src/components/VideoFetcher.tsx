@@ -47,11 +47,25 @@ export default function VideoFetcher() {
             const hooksRes = await getViralHooks(url);
             if (hooksRes.error) {
                 console.warn(hooksRes.error);
-            } else if (hooksRes.hooks) {
-                setHooks(hooksRes.hooks);
-                // 2b. Store transcript
-                if (hooksRes.transcript) {
-                    setTranscript(hooksRes.transcript);
+                setError(hooksRes.error);
+            } else if (hooksRes.clips) {
+                // Map clips to hooks format for this component
+                const mappedHooks = hooksRes.clips.map((clip: any) => ({
+                    start_time: clip.startTime,
+                    end_time: clip.endTime,
+                    segments: clip.segments,
+                    virality_score: clip.score,
+                    type: clip.title
+                }));
+                setHooks(mappedHooks);
+
+                // Extract transcript from first clip if available
+                if (hooksRes.clips[0]?.transcript) {
+                    const fullTranscript = hooksRes.clips
+                        .flatMap((c: any) => c.transcript || [])
+                        .map((t: any) => t.text)
+                        .join(' ');
+                    setTranscript(fullTranscript);
                 }
             }
 

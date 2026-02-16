@@ -108,6 +108,41 @@ export interface Database {
                     transcript_segment?: Json | null
                 }
             }
+            credit_ledger: {
+                Row: {
+                    id: string
+                    created_at: string
+                    user_id: string
+                    amount: number
+                    transaction_type: 'PURCHASE' | 'SUBSCRIPTION_GRANT' | 'BONUS' | 'USAGE'
+                    description: string | null
+                    related_job_id: string | null
+                }
+                Insert: {
+                    id?: string
+                    created_at?: string
+                    user_id: string
+                    amount: number
+                    transaction_type: 'PURCHASE' | 'SUBSCRIPTION_GRANT' | 'BONUS' | 'USAGE'
+                    description?: string | null
+                    related_job_id?: string | null
+                }
+                Update: {
+                    id?: string
+                    created_at?: string
+                    user_id?: string
+                    amount?: number
+                    transaction_type?: 'PURCHASE' | 'SUBSCRIPTION_GRANT' | 'BONUS' | 'USAGE'
+                    description?: string | null
+                    related_job_id?: string | null
+                }
+            }
+        }
+        Functions: {
+            get_credit_balance: {
+                Args: { p_user_id: string }
+                Returns: number
+            }
         }
     }
 }

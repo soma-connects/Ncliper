@@ -63,3 +63,71 @@ Open [http://localhost:3000](http://localhost:3000) with your browser.
 ## Security Note
 
 Video processing uses `youtube-dl-exec` and `ffmpeg`. Input URLs are validated, but ensure your server environment is secure. Do not expose `ffmpeg` arguments directly to user input.
+
+---
+
+## 🚀 Deployment
+
+### Deploy to Vercel (Recommended)
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/your-username/ncliper)
+
+**Quick Steps:**
+
+1. **Install Vercel CLI**
+   ```bash
+   npm i -g vercel
+   vercel login
+   ```
+
+2. **Deploy**
+   ```bash
+   vercel --prod
+   ```
+
+3. **Configure Environment Variables** in Vercel Dashboard (see [.env.production.example](./.env.production.example))
+
+📖 **Detailed Guide**: See [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md) for complete deployment instructions.
+
+### Python Worker Deployment
+
+The video processing worker requires separate deployment:
+- **Modal** (Recommended - $30/month free credits)
+- **Render.com** (100% free forever)
+- **Google Cloud Run** (Generous free tier)
+
+📖 **Worker Setup**: See [WORKER_DEPLOYMENT.md](./WORKER_DEPLOYMENT.md) for detailed instructions.
+
+---
+
+## 🏗️ Project Structure
+
+```
+ncliper/
+├── src/
+│   ├── app/              # Next.js App Router pages
+│   │   ├── api/          # API routes (jobs, projects, health)
+│   │   └── page.tsx      # Main landing/editor page
+│   ├── components/       # React components
+│   │   ├── editor/       # Video editor UI (VideoPlayer, ClipRail, etc.)
+│   │   └── ui/          # Shared UI components
+│   └── lib/
+│       ├── video/        # Video processing actions & utilities
+│       ├── worker/       # Worker integration (Modal, Redis)
+│       └── supabase/     # Database client & queries
+├── python/
+│   └── worker/          # Python video processing worker
+├── public/              # Static assets
+└── supabase/            # Database migrations & schema
+```
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+MIT License - see LICENSE file for details.
+

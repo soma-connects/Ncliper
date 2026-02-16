@@ -3,6 +3,9 @@ import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { invokeModalWorker } from '@/lib/worker/modal';
 import { Database } from '@/lib/supabase/types';
+import { SupabaseClient } from '@supabase/supabase-js';
+
+const supabase = supabaseAdmin as SupabaseClient<Database>;
 
 /**
  * POST /api/jobs
@@ -59,7 +62,7 @@ export async function POST(req: NextRequest) {
             settings: settings || null,
         };
 
-        const { data: jobRecord, error: dbError } = await supabaseAdmin
+        const { data: jobRecord, error: dbError } = await supabase
             .from('jobs')
             .insert(jobInsert as any) // Type assertion: table exists but TS cache needs refresh
             .select()
@@ -118,12 +121,13 @@ export async function POST(req: NextRequest) {
             } catch (error: any) {
                 console.error('[API] Hybrid Pipeline failed:', error);
                 // Update job status to failed
-                await supabaseAdmin
+                const updateData: Database['public']['Tables']['jobs']['Update'] = {
+                    status: 'failed',
+                    error: error.message || 'Pipeline failed'
+                };
+                await supabase
                     .from('jobs')
-                    .update({
-                        status: 'failed',
-                        error: error.message || 'Pipeline failed'
-                    } as any)
+                    .update(updateData)
                     .eq('id', (jobRecord as any).id);
             }
         })();
@@ -165,7 +169,7 @@ export async function GET(req: NextRequest) {
         const offset = parseInt(searchParams.get('offset') || '0', 10);
 
         // Fetch user's jobs
-        const { data: jobs, error } = await supabaseAdmin
+        const { data: jobs, error } = await supabase
             .from('jobs')
             .select('*')
             .eq('user_id', userId)

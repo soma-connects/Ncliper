@@ -39,3 +39,35 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Test files and debug scripts
+test_*.py
+test_*.js
+test_*.ts
+test_*.json
+debug_*.py
+debug_*.js
+**/debug-*.js
+
+# Large binaries (install locally instead)
+ffmpeg.exe
+ffprobe.exe
+*.exe
+
+# Temporary files
+temp_*.ttf
+*.ttf
+test_video.mp4
+test_*.vtt
+test_*.mp4
+
+# Cleanup guide (temporary)
+CLEANUP_GUIDE.md
