@@ -17,6 +17,7 @@ export default function Page() {
                         footerActionLink: 'text-primary hover:text-primary/90'
                     }
                 }}
+                forceRedirectUrl="/dashboard"
             />
         </div>
     );
