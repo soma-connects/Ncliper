@@ -51,9 +51,9 @@ export function EditorView({ projectTitle, projectId, initialClips = [] }: Edito
     return (
         <div className="h-[calc(100vh-140px)] flex flex-col animate-in fade-in zoom-in-95 duration-500">
             {/* Editor Toolbar */}
-            <div className="flex items-center justify-between mb-6 px-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 sm:mb-6 px-2 sm:px-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                    <h2 className="text-lg sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
                         {projectTitle}
                         <span className="px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 text-xs font-bold border border-green-500/20">
                             PRO
@@ -67,15 +67,15 @@ export function EditorView({ projectTitle, projectId, initialClips = [] }: Edito
                         Project auto-saved
                     </p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <button className="flex items-center gap-2 px-4 py-2 bg-secondary/50 text-white rounded-xl text-sm font-medium hover:bg-secondary hover:text-white transition-all border border-white/5 hover:border-white/20">
+                <div className="flex items-center gap-2 sm:gap-3">
+                    <button className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-secondary/50 text-white rounded-xl text-xs sm:text-sm font-medium hover:bg-secondary hover:text-white transition-all border border-white/5 hover:border-white/20">
                         <Wand2 className="w-4 h-4 text-purple-400" />
                         <span>AI Magic</span>
                     </button>
 
                     <button
                         onClick={handleExportAll}
-                        className="flex items-center gap-2 px-6 py-2 bg-white text-black rounded-xl text-sm font-bold shadow-lg shadow-white/10 hover:shadow-white/20 hover:scale-105 transition-all"
+                        className="flex items-center gap-2 px-4 sm:px-6 py-2 bg-white text-black rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-white/10 hover:shadow-white/20 hover:scale-105 transition-all"
                     >
                         {isExporting ? (
                             <Wand2 className="w-4 h-4 animate-spin" />
@@ -89,7 +89,7 @@ export function EditorView({ projectTitle, projectId, initialClips = [] }: Edito
 
             {/* Main Editor Grid - Responsive Layout */}
             {/* Desktop: Rail | Player | Transcript */}
-            <div className="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden min-h-0 px-2 pb-2 relative">
+            <div className="flex-1 flex flex-col lg:flex-row gap-3 sm:gap-6 overflow-hidden min-h-0 px-1 sm:px-2 pb-2 relative">
 
                 {/* Mobile Tabs (Visible only on lg and below) */}
                 <div className="lg:hidden flex items-center justify-center gap-4 mb-4 shrink-0">

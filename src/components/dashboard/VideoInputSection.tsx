@@ -93,13 +93,13 @@ export function VideoInputSection({ onVideoFound, isLoading = false }: VideoInpu
     const isBusy = localLoading || isLoading;
 
     return (
-        <div className="w-full max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
+        <div className="w-full max-w-2xl mx-auto space-y-6 sm:space-y-8 px-4 sm:px-0 animate-in fade-in slide-in-from-bottom-8 duration-700">
             <div className="text-center space-y-4">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-semibold uppercase tracking-wider">
                     <Sparkles className="w-3 h-3" />
                     <span>AI-Powered Virality</span>
                 </div>
-                <h2 className="text-5xl font-bold tracking-tight text-white">
+                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-white">
                     Turn Long Videos into <br />
                     <span className="bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">Viral Shorts Instantly</span>
                 </h2>
@@ -111,8 +111,8 @@ export function VideoInputSection({ onVideoFound, isLoading = false }: VideoInpu
             <form onSubmit={handleSubmit} className="relative group">
                 <div className="absolute -inset-1 bg-gradient-to-r from-primary to-purple-600 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200" />
 
-                <div className="relative flex items-center bg-card border border-border rounded-2xl p-2 shadow-2xl">
-                    <div className="pl-4 pr-3 text-muted-foreground">
+                <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center bg-card border border-border rounded-2xl p-2 shadow-2xl gap-2 sm:gap-0">
+                    <div className="pl-3 sm:pl-4 pr-3 text-muted-foreground hidden sm:block">
                         <Youtube className="w-6 h-6" />
                     </div>
                     <input
@@ -120,14 +120,14 @@ export function VideoInputSection({ onVideoFound, isLoading = false }: VideoInpu
                         value={url}
                         onChange={(e) => setUrl(e.target.value)}
                         placeholder="Paste YouTube Link (e.g. https://youtube.com/watch?v=...)"
-                        className="flex-1 bg-transparent border-none text-white placeholder:text-muted-foreground/50 focus:outline-none focus:ring-0 text-lg py-2"
+                        className="flex-1 bg-transparent border-none text-white placeholder:text-muted-foreground/50 focus:outline-none focus:ring-0 text-base sm:text-lg py-2 px-3 sm:px-0 min-w-0"
                         disabled={isBusy}
                     />
                     <button
                         type="submit"
                         disabled={isBusy || !url}
                         className={cn(
-                            "h-12 px-6 rounded-xl font-semibold text-white shadow-lg transition-all flex items-center gap-2",
+                            "h-12 px-6 rounded-xl font-semibold text-white shadow-lg transition-all flex items-center justify-center gap-2 w-full sm:w-auto",
                             isBusy
                                 ? "bg-muted cursor-not-allowed"
                                 : "bg-primary hover:bg-primary/90 hover:shadow-primary/25 active:scale-95"
@@ -154,7 +154,7 @@ export function VideoInputSection({ onVideoFound, isLoading = false }: VideoInpu
                 </div>
             )}
 
-            <div className="flex justify-center gap-8 text-sm text-muted-foreground pt-4">
+            <div className="flex flex-wrap justify-center gap-4 sm:gap-8 text-xs sm:text-sm text-muted-foreground pt-4">
                 <div className="flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
                     <span>Auto-Captions</span>

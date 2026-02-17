@@ -1,11 +1,14 @@
 'use client';
 
-import { Bell, Search, ChevronDown, Sparkles } from "lucide-react";
+import { Bell, Search, Menu, Sparkles } from "lucide-react";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
-import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 
-export function Topbar() {
+interface TopbarProps {
+    onMenuToggle: () => void;
+}
+
+export function Topbar({ onMenuToggle }: TopbarProps) {
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
@@ -13,17 +16,23 @@ export function Topbar() {
     }, []);
 
     return (
-        <header className="h-20 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-40 flex items-center justify-between px-8 pl-72 transition-all duration-300">
+        <header className="h-16 sm:h-20 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-30 flex items-center justify-between px-4 sm:px-8 lg:pl-72 transition-all duration-300">
 
-            {/* Left: Breadcrumbs / Title */}
-            <div className="flex items-center gap-4">
-                <h1 className="text-xl font-bold tracking-tight text-white">Dashboard</h1>
-                <div className="h-6 w-[1px] bg-border" />
-                <span className="text-sm text-muted-foreground">Overview</span>
+            {/* Left: Hamburger + Title */}
+            <div className="flex items-center gap-3">
+                <button
+                    onClick={onMenuToggle}
+                    className="lg:hidden p-2 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-white transition-colors"
+                >
+                    <Menu className="w-5 h-5" />
+                </button>
+                <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white">Dashboard</h1>
+                <div className="h-6 w-[1px] bg-border hidden sm:block" />
+                <span className="text-sm text-muted-foreground hidden sm:block">Overview</span>
             </div>
 
-            {/* Middle: Search (Optional, could be global) */}
-            <div className="flex-1 max-w-xl mx-8 relative hidden md:block">
+            {/* Middle: Search */}
+            <div className="flex-1 max-w-xl mx-4 sm:mx-8 relative hidden md:block">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
                     type="text"
@@ -33,21 +42,21 @@ export function Topbar() {
             </div>
 
             {/* Right: Actions */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
                 {/* Upgrade Button */}
-                <button className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-primary to-purple-600 text-white px-4 py-2 rounded-full text-xs font-bold shadow-[0_0_15px_rgba(139,92,246,0.3)] hover:shadow-[0_0_25px_rgba(139,92,246,0.5)] transition-shadow">
+                <button className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-primary to-purple-600 text-white px-3 sm:px-4 py-2 rounded-full text-xs font-bold shadow-[0_0_15px_rgba(139,92,246,0.3)] hover:shadow-[0_0_25px_rgba(139,92,246,0.5)] transition-shadow">
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>UPGRADE PRO</span>
+                    <span className="hidden md:inline">UPGRADE PRO</span>
                 </button>
 
-                <div className="h-6 w-[1px] bg-border mx-2" />
+                <div className="h-6 w-[1px] bg-border mx-1 hidden sm:block" />
 
-                <button className="relative w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/5 transition-colors">
-                    <Bell className="w-5 h-5 text-muted-foreground" />
-                    <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-background" />
+                <button className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center hover:bg-white/5 transition-colors">
+                    <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+                    <span className="absolute top-2 right-2 sm:top-2.5 sm:right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-background" />
                 </button>
 
-                <div className="flex items-center gap-3 pl-2">
+                <div className="flex items-center gap-2 sm:gap-3">
                     {mounted ? (
                         <>
                             <SignedIn>
@@ -58,7 +67,7 @@ export function Topbar() {
                                         }
                                     }}
                                 />
-                                <div className="hidden md:flex flex-col items-start gap-0.5">
+                                <div className="hidden lg:flex flex-col items-start gap-0.5">
                                     <span className="text-xs font-semibold text-white">
                                         <span className="opacity-70">Welcome back</span>
                                     </span>
@@ -66,7 +75,6 @@ export function Topbar() {
                                 </div>
                             </SignedIn>
                             <SignedOut>
-                                {/* This helps avoids layout shift or provides a fallback if needed */}
                                 <div className="w-8 h-8 rounded-full bg-secondary animate-pulse" />
                             </SignedOut>
                         </>
