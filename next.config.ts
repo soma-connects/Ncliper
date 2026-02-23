@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
     // Runs the compiler in a separate worker to protect the main process
     webpackBuildWorker: true,
   },
+  serverExternalPackages: ['fluent-ffmpeg', 'youtube-dl-exec'],
+  outputFileTracingIncludes: {
+    '/api/**/*': ['./node_modules/youtube-dl-exec/bin/**/*'],
+  },
   // Ignore ESLint errors during build to allow deployment
   eslint: {
     ignoreDuringBuilds: true,

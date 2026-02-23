@@ -94,7 +94,8 @@ export async function getVideoTitle(url: string, ytDlpPathArg?: string): Promise
         }
 
         const path = await import('path');
-        const ytDlpPath = ytDlpPathArg || path.join(process.cwd(), 'node_modules', 'youtube-dl-exec', 'bin', 'yt-dlp.exe');
+        const isWindows = typeof process !== 'undefined' && process.platform === 'win32';
+        const ytDlpPath = ytDlpPathArg || path.join(process.cwd(), 'node_modules', 'youtube-dl-exec', 'bin', isWindows ? 'yt-dlp.exe' : 'yt-dlp');
 
         console.log(`[VideoFetcher] Using yt-dlp path: ${ytDlpPath}`);
 
@@ -132,7 +133,8 @@ export async function getViralHooks(url: string) {
         }
 
         const path = await import('path');
-        const ytDlpPath = path.join(process.cwd(), 'node_modules', 'youtube-dl-exec', 'bin', 'yt-dlp.exe');
+        const isWindows = typeof process !== 'undefined' && process.platform === 'win32';
+        const ytDlpPath = path.join(process.cwd(), 'node_modules', 'youtube-dl-exec', 'bin', isWindows ? 'yt-dlp.exe' : 'yt-dlp');
 
         // Extract video ID from URL
         let videoId = "";
@@ -304,7 +306,8 @@ export async function generateClip(url: string, segments: { start: number; end: 
         if (!segments || segments.length === 0) return { error: "Segments are required" };
 
         const path = await import('path');
-        const ytDlpPath = path.join(process.cwd(), 'node_modules', 'youtube-dl-exec', 'bin', 'yt-dlp.exe');
+        const isWindows = typeof process !== 'undefined' && process.platform === 'win32';
+        const ytDlpPath = path.join(process.cwd(), 'node_modules', 'youtube-dl-exec', 'bin', isWindows ? 'yt-dlp.exe' : 'yt-dlp');
 
         let mergedCaptions: any[] = [];
         let currentOutputTime = 0;
