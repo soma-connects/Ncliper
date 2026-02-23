@@ -80,22 +80,29 @@ export async function POST(req: NextRequest) {
         // We run the download/upload locally to use residential IP, then invoke Modal
         (async () => {
             try {
-                console.log(`[API] Starting Hybrid Pipeline for job ${(jobRecord as any).id}`);
+                console.log(`[API] Starting Pipeline for job ${(jobRecord as any).id}`);
 
-                // Import dynamically to avoid top-level await issues if any
-                const { downloadVideoLocally, uploadToR2 } = await import('@/lib/video-downloader');
+                const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+                let r2Url = undefined;
+                let filePath = undefined;
 
-                // 5a. Local Download (Bypasses YouTube blocking)
-                console.log('[API] Step 1: Downloading locally...');
-                const filePath = await downloadVideoLocally(video_url, (jobRecord as any).id);
+                if (!isProduction) {
+                    // Import dynamically to avoid top-level await issues if any
+                    const { downloadVideoLocally, uploadToR2 } = await import('@/lib/video-downloader');
 
-                // 5b. Upload to R2
-                console.log('[API] Step 2: Uploading to R2...');
-                const r2Key = `raw/${(jobRecord as any).id}.mp4`;
-                const r2Url = await uploadToR2(filePath, r2Key);
-                console.log(`[API] R2 URL: ${r2Url}`);
+                    // 5a. Local Download (Bypasses YouTube blocking)
+                    console.log('[API] Step 1: Downloading locally (Residential IP Bypass)...');
+                    filePath = await downloadVideoLocally(video_url, (jobRecord as any).id);
 
-                // 5c. Invoke Modal with R2 URL
+                    // 5b. Upload to R2
+                    console.log('[API] Step 2: Uploading to R2...');
+                    const r2Key = `raw/${(jobRecord as any).id}.mp4`;
+                    r2Url = await uploadToR2(filePath, r2Key);
+                    console.log(`[API] R2 URL: ${r2Url}`);
+                } else {
+                    console.log('[API] Production environment detected: Skipping local download. Modal will download directly.');
+                }
+
                 // 5c. Invoke Modal or Mock Worker
                 if (process.env.NODE_ENV === 'development' && !process.env.FORCE_MODAL) {
                     console.log('[API] Dev mode detected: Using Mock Worker');
@@ -117,7 +124,7 @@ export async function POST(req: NextRequest) {
                             width: settings?.aspect_ratio === '1:1' ? 1080 : 1080,
                             height: settings?.aspect_ratio === '16:9' ? 1080 : 1920,
                             clip_count: settings?.clip_count || 3,
-                            download_url: r2Url, // Pass the R2 URL
+                            ...(r2Url ? { download_url: r2Url } : {}) // Only pass if we uploaded to R2
                         },
                     };
                     await invokeModalWorker(modalParams);
@@ -125,9 +132,11 @@ export async function POST(req: NextRequest) {
                 }
 
                 // Clean up temp file
-                const fs = await import('fs');
-                if (fs.existsSync(filePath)) {
-                    fs.unlinkSync(filePath);
+                if (filePath) {
+                    const fs = await import('fs');
+                    if (fs.existsSync(filePath)) {
+                        fs.unlinkSync(filePath);
+                    }
                 }
 
             } catch (error: any) {
