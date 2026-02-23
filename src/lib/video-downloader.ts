@@ -34,8 +34,10 @@ export async function downloadVideoLocally(url: string, jobId: string): Promise<
         fs.unlinkSync(filePath);
     }
 
-    // Locate yt-dlp binary
-    const binaryPath = path.join(process.cwd(), 'node_modules', 'youtube-dl-exec', 'bin', 'yt-dlp.exe');
+    // Locate yt-dlp binary (handle Windows vs Linux/Vercel)
+    const isWindows = typeof process !== 'undefined' && process.platform === 'win32';
+    const binaryName = isWindows ? 'yt-dlp.exe' : 'yt-dlp';
+    const binaryPath = path.join(process.cwd(), 'node_modules', 'youtube-dl-exec', 'bin', binaryName);
     console.log(`[LocalDownloader] Spawning yt-dlp: ${binaryPath}`);
 
     return new Promise((resolve, reject) => {
