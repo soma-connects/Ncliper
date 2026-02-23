@@ -21,6 +21,7 @@ export interface JobData {
         };
     };
     error?: string;
+    message?: string;
 }
 
 export function useJobPolling(jobId: string | null) {

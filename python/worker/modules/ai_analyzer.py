@@ -153,44 +153,48 @@ def analyze_transcript(transcript: str) -> List[ViralHook]:
         ]
     
     try:
-        # Model strategy (matching TypeScript):
-        # 1. Try gemini-2.0-flash (primary)
-        # 2. Fallback to gemini-flash-latest
+        # Model strategy:
+        # 1. Try gemini-1.5-flash (fast, cheap, good for long context)
+        # 2. Fallback to gemini-1.5-pro-latest (if higher reasoning needed)
         
-        primary_model_name = "gemini-2.0-flash"
-        fallback_model_name = "gemini-flash-latest"
+        primary_model_name = "gemini-1.5-flash"
+        fallback_model_name = "gemini-1.5-pro-latest"
         
-        # Prompt (matching TypeScript virality.ts)
+        # Enhanced Virality Prompt
         import random
         prompt = f"""
-You are a Viral Content Strategist for Ncliper. Analyze this transcript to find exactly 3 viral segments suitable for Long-Form Shorts/Reels.
+You are the Lead Viral Strategist for Ncliper. Your goal is to extract **High-Retention Short-Form Content** from this transcript.
 
-CRITICAL "INTELLIGENT MERGING" RULES:
-- You can (and should) MERGE disparate parts of the video if they form a stronger narrative.
-- Example: A video has a Setup (0:00-0:30), then boring fluff, then a Payoff (2:00-2:30).
-- Return this as ONE hook with `segments: [{{"start": 0, "end": 30}}, {{"start": 120, "end": 150}}]`.
-- The total duration of all segments combined must be between 60 and 180 seconds.
+**TARGET AUDIENCE:** 
+Gen Z / Millennials on TikTok, Reels, and Shorts. 
+They have a 3-second attention span.
 
-**VIRALITY RUBRIC (Scoring 0-100):**
-1. **Hook Strength (40%)**: Does the first 3 seconds grab attention? (e.g. "I almost died...", "You won't believe...", "The secret to...")
-2. **Pacing (30%)**: Is the content dense? (Remove pauses, filler words, slow transitions = High Pacing)
-3. **Emotional/Intellectual Value (30%)**: Does it trigger curiosity, anger, awe, or provide high utility?
+**CORE REQUIREMENT:**
+Find segments that can stand alone as complete mini-stories or value bombs.
 
-**PRECISION RULE**: 
-- Segments MUST start at the beginning of a complete sentence or a clear visual cut. 
-- Do NOT start mid-sentence. 
-- Verify timestamp precision to 0.1s.
+**HOOK TYPES TO FIND:**
+1.  **The "Pattern Interrupt"**: Moments that break the expected flow or startle the viewer.
+2.  **The "Curiosity Gap"**: Statements that beg a question (e.g., "I never thought this would happen...").
+3.  **The "Value Bomb"**: Concise, actionable advice delivered with conviction.
+4.  **The "Story Climax"**: High-stakes moment or emotional peak.
 
-Content Types:
-1. "The Deep Dive": Explain a concept fully. (Hormozi Style: Hook -> Value -> Value -> CTA)
-2. "The Story Arc": Setup -> Conflict -> Resolution. (MrBeast Style: High stakes immediately)
-3. "The Contrarian Argument": Premise -> Evidence -> Conclusion.
+**INTELLIGENT MERGING:**
+-   Merge widely separated sentences if they form a coherent narrative.
+-   Example: Intro (0:10) + Conclusion (5:45) = 1 powerful clip.
+-   Total duration MUST be 15-60 seconds (ideal for Shorts).
 
-Transcript: "{transcript[:20000]}"
+**SCORING RUBRIC (0-100):**
+-   **90-100**: Guaranteed viral. Perfect hook, zero fluff, high emotion/value.
+-   **80-89**: Strong. Good hook, standard pacing.
+-   **70-79**: Decent. Usable but needs heavy editing.
+-   **<70**: Ignore.
 
-Return ONLY a JSON array following the requested schema. Ensure `segments` contains the precise cuts.
+**TRANSCRIPT:**
+"{transcript[:30000]}"
 
-[Random Seed: {random.random()}]
+**OUTPUT:**
+Return a strict JSON array of objects adhering to the `ViralHook` schema. 
+Ensure timestamps are PRECISE.
 """
         
         # Try primary model
@@ -277,7 +281,7 @@ def upload_video_for_analysis(video_path: str):
 
 def analyze_video(video_path: str, transcript: str = "") -> List[ViralHook]:
     """
-    Analyze video VISUALLY with Gemini 1.5 Pro
+    Analyze video VISUALLY with Gemini 1.5 Flash (Multimodal)
     Falls back to transcript-only if upload fails
     """
     if not API_KEY:
@@ -291,7 +295,7 @@ def analyze_video(video_path: str, transcript: str = "") -> List[ViralHook]:
 
         # 2. Prepare Multimodal Prompt
         prompt = """
-You are a Viral Content Strategist. Watch this video and identify exactly 3 viral segments associated with the provided transcript.
+You are a Lead Viral Strategist. Watch this video and identify exactly 3 viral segments.
 
 **ANALYSIS GOAL:**
 Find moments where the VISUAL action matches the AUDIO hook. 
@@ -307,8 +311,8 @@ Find moments where the VISUAL action matches the AUDIO hook.
 Return strict JSON array of hooks (same schema as before).
 Ensure timestamps are accurate to what you SEE and HEAR.
 """
-        # 3. Call Gemini 1.5 Pro
-        model_name = "gemini-1.5-pro-latest"
+        # 3. Call Gemini 1.5 Flash
+        model_name = "gemini-1.5-flash"
         print(f"[AI] Analyzing video with {model_name}...")
         
         model = genai.GenerativeModel(

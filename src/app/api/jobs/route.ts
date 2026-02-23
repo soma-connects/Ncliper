@@ -96,21 +96,33 @@ export async function POST(req: NextRequest) {
                 console.log(`[API] R2 URL: ${r2Url}`);
 
                 // 5c. Invoke Modal with R2 URL
-                console.log('[API] Step 3: Invoking Modal Worker...');
-                const modalParams = {
-                    job_id: (jobRecord as any).id,
-                    project_id: (jobRecord as any).settings?.project_id || '',
-                    video_url, // Keep original URL for metadata
-                    settings: {
-                        width: settings?.aspect_ratio === '1:1' ? 1080 : 1080,
-                        height: settings?.aspect_ratio === '16:9' ? 1080 : 1920,
-                        clip_count: settings?.clip_count || 3,
-                        download_url: r2Url, // Pass the R2 URL
-                    },
-                };
-
-                await invokeModalWorker(modalParams);
-                console.log('[API] Modal invocation successful');
+                // 5c. Invoke Modal or Mock Worker
+                if (process.env.NODE_ENV === 'development' && !process.env.FORCE_MODAL) {
+                    console.log('[API] Dev mode detected: Using Mock Worker');
+                    const { processJobMock } = await import('@/lib/worker/mock-worker');
+                    // Run mock processing (async, don't await)
+                    processJobMock(
+                        (jobRecord as any).id,
+                        video_url,
+                        userId,
+                        supabase
+                    );
+                } else {
+                    console.log('[API] Step 3: Invoking Modal Worker...');
+                    const modalParams = {
+                        job_id: (jobRecord as any).id,
+                        project_id: (jobRecord as any).settings?.project_id || '',
+                        video_url, // Keep original URL for metadata
+                        settings: {
+                            width: settings?.aspect_ratio === '1:1' ? 1080 : 1080,
+                            height: settings?.aspect_ratio === '16:9' ? 1080 : 1920,
+                            clip_count: settings?.clip_count || 3,
+                            download_url: r2Url, // Pass the R2 URL
+                        },
+                    };
+                    await invokeModalWorker(modalParams);
+                    console.log('[API] Modal invocation successful');
+                }
 
                 // Clean up temp file
                 const fs = await import('fs');

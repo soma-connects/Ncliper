@@ -38,7 +38,7 @@ export function VideoInputSection({ onVideoFound, isLoading = false }: VideoInpu
             setLocalLoading(false);
             setCurrentJobId(null);
         } else if (jobStatus === 'processing') {
-            setStatusMessage("Processing video...");
+            setStatusMessage(jobData?.message || "Processing video...");
         } else if (jobStatus === 'queued') {
             setStatusMessage("Job queued, waiting for worker...");
         }
