@@ -11,13 +11,12 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     '/api/**/*': ['./node_modules/youtube-dl-exec/bin/**/*'],
   },
-  // Ignore ESLint errors during build to allow deployment
+  // Strict linting and TS checking enabled for production builds
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
-  // Ignore TypeScript errors during build to allow deployment (verified locally)
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
     remotePatterns: [

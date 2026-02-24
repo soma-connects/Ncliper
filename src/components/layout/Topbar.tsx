@@ -1,8 +1,9 @@
 'use client';
 
-import { Bell, Search, Menu, Sparkles } from "lucide-react";
+import { Bell, Menu, Sparkles } from "lucide-react";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { useState, useEffect } from "react";
+import { SemanticSearchInput } from "../dashboard/SemanticSearchInput";
 
 interface TopbarProps {
     onMenuToggle: () => void;
@@ -33,12 +34,7 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
 
             {/* Middle: Search */}
             <div className="flex-1 max-w-xl mx-4 sm:mx-8 relative hidden md:block">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                    type="text"
-                    placeholder="Search projects, clips, or templates..."
-                    className="w-full bg-secondary/50 border border-border rounded-full pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-muted-foreground/70"
-                />
+                <SemanticSearchInput />
             </div>
 
             {/* Right: Actions */}

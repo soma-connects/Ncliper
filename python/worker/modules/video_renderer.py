@@ -103,7 +103,8 @@ def render_clip(
     end_time: float,
     segments: Optional[List[Dict[str, float]]] = None,
     crop_filter: Optional[str] = None,
-    config: Optional[RenderConfig] = None
+    config: Optional[RenderConfig] = None,
+    speaker_timeline: Optional[List[Any]] = None
 ) -> str:
     """
     Render a video clip with optional cropping and segment merging
@@ -137,14 +138,52 @@ def render_clip(
             video_info['height']
         )
     
-    # Ensure output directory exists
     os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else '.', exist_ok=True)
+    
+    # -----------------------------
+    # Active Speaker Smart Cropping
+    # -----------------------------
+    # Default behavior is a static crop. If we have a speaker timeline,
+    # generate a dynamic FFmpeg evaluation filter for `x` position.
+    final_crop_filter = crop_filter
+    
+    if speaker_timeline and len(speaker_timeline) > 0:
+        print(f"[Renderer] Applying dynamic active speaker crop tracking")
+        scale_w, scale_h = config.output_width, config.output_height
+        
+        # Original scale size based on 9:16 target (e.g. 720:1280)
+        # We assume video_width scaled so height = 1280, then we slide 720 width.
+        # But we don't have scale=x:1280 in python code yet, so we just build 
+        # a dynamic x crop string for the exact same static scale filter below.
+        
+        # Let's override `final_crop_filter`. A basic crop=W:H:X:Y string.
+        # Target aspect: 9:16
+        target_aspect = 9 / 16
+        c_width = int(video_info['height'] * target_aspect)
+        c_width = c_width - (c_width % 2)
+        c_height = video_info['height']
+        
+        # Base fallback expr: center crop
+        expr_x = f"({video_info['width']}-{c_width})/2"
+        
+        # Build backwards to nest the 'if' statements
+        for seg in reversed(speaker_timeline):
+            # seg is a SpeakerTimelineSegment object
+            rel_start = max(0, seg.start_time - start_time)
+            rel_end = seg.end_time - start_time
+            if rel_end < 0:
+                continue
+                
+            x_pos = f"({video_info['width']}-{c_width})*{seg.position}"
+            expr_x = f"if(between(t,{rel_start},{rel_end}),{x_pos},{expr_x})"
+            
+        final_crop_filter = f"crop={c_width}:{c_height}:'{expr_x}':0"
     
     # Build FFmpeg command
     if segments and len(segments) > 1:
         # Intelligent merging: concat multiple segments
         output_path = render_merged_segments(
-            input_video, output_path, segments, crop_filter, config
+            input_video, output_path, segments, final_crop_filter, config
         )
     else:
         # Simple clip extraction
@@ -157,7 +196,7 @@ def render_clip(
             '-t', str(duration),  # Duration
             '-i', input_video,
             '-filter_complex',
-            f"[0:v]{crop_filter},scale={config.output_width}:{config.output_height}[v]",
+            f"[0:v]{final_crop_filter},scale={config.output_width}:{config.output_height}[v]",
             '-map', '[v]',
             '-map', '0:a',  # Copy audio
             '-c:v', config.codec,

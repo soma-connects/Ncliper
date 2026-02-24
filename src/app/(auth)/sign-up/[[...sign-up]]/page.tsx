@@ -18,6 +18,8 @@ export default function Page() {
                     }
                 }}
                 forceRedirectUrl="/dashboard"
+                fallbackRedirectUrl="/dashboard"
+                signInFallbackRedirectUrl="/dashboard"
             />
         </div>
     );

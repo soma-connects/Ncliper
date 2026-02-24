@@ -1,9 +1,11 @@
 /**
- * Custom hook for polling job status
- * Polls /api/jobs/[id] every 3 seconds until completion or failure
+ * Custom hook for subscribing to job status via WebSockets
+ * Replaces the old 3-second polling mechanism with instant Supabase Realtime updates.
  */
 
 import { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import { Clip } from '@/lib/video/types';
 
 export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed';
 
@@ -13,7 +15,7 @@ export interface JobData {
     created_at: string;
     updated_at: string;
     result_data?: {
-        clips: any[];
+        clips: Clip[];
         metadata: {
             title: string;
             duration: number;
@@ -23,6 +25,11 @@ export interface JobData {
     error?: string;
     message?: string;
 }
+
+// Ensure you have these exposed to the client in Next.js (.env.local)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export function useJobPolling(jobId: string | null) {
     const [status, setStatus] = useState<JobStatus | null>(null);
@@ -35,78 +42,89 @@ export function useJobPolling(jobId: string | null) {
             setStatus(null);
             setData(null);
             setError(null);
+            setIsPolling(false);
             return;
         }
 
         setIsPolling(true);
         let isMounted = true;
-        let pollCount = 0;
-        const maxPolls = 120; // Max 6 minutes (120 * 3s)
 
-        const pollStatus = async () => {
+        // 1. Fetch initial state immediately
+        const fetchInitialState = async () => {
             try {
                 const res = await fetch(`/api/jobs/${jobId}`);
-
-                if (!res.ok) {
-                    throw new Error(`Failed to fetch job status: ${res.status}`);
-                }
-
+                if (!res.ok) throw new Error(`Failed to fetch job status: ${res.status}`);
                 const result: JobData = await res.json();
 
                 if (!isMounted) return;
-
                 setStatus(result.status);
                 setData(result);
 
-                // Stop polling on completion or failure
+                if (result.status === 'failed') setError(result.error || 'Job failed');
                 if (result.status === 'completed' || result.status === 'failed') {
                     setIsPolling(false);
-                    if (result.status === 'failed') {
-                        setError(result.error || 'Job failed');
-                    }
-                    return true; // Signal to stop polling
                 }
-
-                return false; // Continue polling
             } catch (err: any) {
-                if (!isMounted) return true;
-
-                console.error('[JobPolling] Error:', err);
-                setError(err.message || 'Failed to poll job status');
-                setIsPolling(false);
-                return true; // Stop on error
+                if (isMounted) setError(err.message || 'Initial fetch failed');
             }
         };
 
-        // Initial poll
-        pollStatus();
+        fetchInitialState();
 
-        // Set up polling interval
-        const interval = setInterval(async () => {
-            pollCount++;
+        // 2. Subscribe to Supabase Realtime for instant updates
+        const channel = supabase
+            .channel(`job-${jobId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'jobs',
+                    filter: `id=eq.${jobId}`
+                },
+                (payload) => {
+                    const result = payload.new as JobData;
+                    if (!isMounted) return;
 
-            // Safety: Stop after max polls
-            if (pollCount >= maxPolls) {
-                console.warn('[JobPolling] Max polls reached, stopping');
-                setError('Job timed out - please check status manually');
-                setIsPolling(false);
-                clearInterval(interval);
-                return;
-            }
+                    console.log("[Realtime] Status update:", result.status, result.message);
+                    setStatus(result.status);
+                    setData(result);
 
-            const shouldStop = await pollStatus();
-            if (shouldStop) {
-                clearInterval(interval);
-            }
-        }, 3000); // Poll every 3 seconds
+                    if (result.status === 'failed') {
+                        setError(result.error || 'Job failed');
+                        setIsPolling(false);
+                    } else if (result.status === 'completed') {
+                        setIsPolling(false);
+
+                        // Attempt browser notification
+                        if ('Notification' in window && Notification.permission === 'granted') {
+                            new Notification('Ncliper: Video Ready!', {
+                                body: 'Your viral clips have been successfully generated.',
+                                icon: '/favicon.ico'
+                            });
+                        }
+                    }
+                }
+            )
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log(`[Realtime] Subscribed to job ${jobId}`);
+                }
+            });
 
         // Cleanup
         return () => {
             isMounted = false;
-            clearInterval(interval);
-            setIsPolling(false);
+            supabase.removeChannel(channel);
         };
     }, [jobId]);
+
+    // Request notification permission on first mount if not asked
+    useEffect(() => {
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+    }, []);
 
     return { status, data, error, isPolling };
 }

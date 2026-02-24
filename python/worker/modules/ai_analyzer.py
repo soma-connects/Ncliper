@@ -24,6 +24,13 @@ class ViralSegment:
     start: float  # seconds
     end: float    # seconds
 
+@dataclass
+class SpeakerTimelineSegment:
+    """Timeline segment indicating speaker position"""
+    start_time: float
+    end_time: float
+    position: float
+
 
 @dataclass
 class ViralHook:
@@ -33,6 +40,7 @@ class ViralHook:
     segments: List[ViralSegment]  # Specific cuts to merge
     virality_score: int  # 0-100
     type: str  # "Pattern Interrupt", "High-Retention Hook", etc.
+    speaker_timeline: Optional[List[SpeakerTimelineSegment]] = None
 
 
 # Gemini response schema (matching TypeScript)
@@ -74,6 +82,20 @@ HOOK_SCHEMA = {
                 "type": "STRING",
                 "description": "Type of hook: 'Pattern Interrupt', 'High-Retention Hook', etc.",
                 "nullable": False
+            },
+            "speaker_timeline": {
+                "type": "ARRAY",
+                "description": "Timeline of active speaker positions (0.0=left, 0.5=center, 1.0=right)",
+                "items": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "start_time": {"type": "NUMBER", "nullable": False},
+                        "end_time": {"type": "NUMBER", "nullable": False},
+                        "position": {"type": "NUMBER", "nullable": False}
+                    },
+                    "required": ["start_time", "end_time", "position"]
+                },
+                "nullable": True
             }
         },
         "required": ["start_time", "end_time", "segments", "virality_score", "type"],
@@ -183,6 +205,15 @@ Find segments that can stand alone as complete mini-stories or value bombs.
 -   Example: Intro (0:10) + Conclusion (5:45) = 1 powerful clip.
 -   Total duration MUST be 15-60 seconds (ideal for Shorts).
 
+**SPEAKER DIARIZATION (CRITICAL FOR PODCASTS)**:
+- If there are multiple active speakers (e.g., a podcast format), you must generate a `speaker_timeline`.
+- For each segment, output the `start_time` and `end_time` of who is actively talking, and their `position` on screen.
+- `position` values MUST be:
+    - `0.0` if the speaker is on the LEFT side of the screen.
+    - `1.0` if the speaker is on the RIGHT side of the screen.
+    - `0.5` if there is only one center speaker, or both are speaking/visible center.
+- The sum of `speaker_timeline` segments must cover the entire combined duration of the `segments`.
+
 **SCORING RUBRIC (0-100):**
 -   **90-100**: Guaranteed viral. Perfect hook, zero fluff, high emotion/value.
 -   **80-89**: Strong. Good hook, standard pacing.
@@ -237,12 +268,23 @@ Ensure timestamps are PRECISE.
                 for seg in hook_dict["segments"]
             ]
             
+            speaker_timeline = None
+            if "speaker_timeline" in hook_dict and hook_dict["speaker_timeline"]:
+                speaker_timeline = [
+                    SpeakerTimelineSegment(
+                        start_time=st["start_time"], 
+                        end_time=st["end_time"], 
+                        position=st["position"]
+                    ) for st in hook_dict["speaker_timeline"]
+                ]
+            
             hooks.append(ViralHook(
                 start_time=hook_dict["start_time"],
                 end_time=hook_dict["end_time"],
                 segments=segments,
                 virality_score=hook_dict["virality_score"],
-                type=hook_dict["type"]
+                type=hook_dict["type"],
+                speaker_timeline=speaker_timeline
             ))
         
         
@@ -339,12 +381,23 @@ Ensure timestamps are accurate to what you SEE and HEAR.
                 for seg in hook_dict["segments"]
             ]
             
+            speaker_timeline = None
+            if "speaker_timeline" in hook_dict and hook_dict["speaker_timeline"]:
+                speaker_timeline = [
+                    SpeakerTimelineSegment(
+                        start_time=st["start_time"], 
+                        end_time=st["end_time"], 
+                        position=st["position"]
+                    ) for st in hook_dict["speaker_timeline"]
+                ]
+            
             hooks.append(ViralHook(
                 start_time=hook_dict["start_time"],
                 end_time=hook_dict["end_time"],
                 segments=segments,
                 virality_score=hook_dict["virality_score"],
-                type=hook_dict.get("type", "Visual Hook")
+                type=hook_dict.get("type", "Visual Hook"),
+                speaker_timeline=speaker_timeline
             ))
             
         print(f"[AI] Found {len(hooks)} multimodal hooks!")

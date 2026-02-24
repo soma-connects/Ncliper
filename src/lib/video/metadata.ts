@@ -1,5 +1,5 @@
 import 'server-only';
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType, GenerativeModel, GenerateContentResult, Schema } from "@google/generative-ai";
 
 const API_KEY = process.env.GOOGLE_API_KEY || "";
 const genAI = new GoogleGenerativeAI(API_KEY);
@@ -24,17 +24,15 @@ const metadataSchema = {
 
 // Duplicating retry utility to avoid circular deps for now
 // Ideally this moves to src/lib/ai/client.ts
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const generateWithRetry = async (model: any, prompt: string, retries = 3, delay = 1000): Promise<any> => {
+const generateWithRetry = async (model: GenerativeModel, prompt: string, retries = 3, delay = 1000): Promise<GenerateContentResult> => {
     try {
         return await model.generateContent(prompt);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-        if (retries > 0 && (error.status === 429 || error.message?.includes('429'))) {
+    } catch (error: unknown) {
+        const err = error as { status?: number; message?: string; errorDetails?: { '@type'?: string; retryDelay?: string }[] };
+        if (retries > 0 && (err.status === 429 || err.message?.includes('429'))) {
             let waitTime = delay;
-            if (error.errorDetails) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const retryInfo = error.errorDetails.find((d: any) =>
+            if (err.errorDetails) {
+                const retryInfo = err.errorDetails.find((d) =>
                     d['@type']?.includes('RetryInfo') || d.retryDelay
                 );
                 if (retryInfo && retryInfo.retryDelay) {
@@ -65,8 +63,7 @@ export const generateClipMetadata = async (transcript: string) => {
             model: "gemini-2.0-flash-lite",
             generationConfig: {
                 responseMimeType: "application/json",
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                responseSchema: metadataSchema as any,
+                responseSchema: metadataSchema as Schema,
             }
         });
 

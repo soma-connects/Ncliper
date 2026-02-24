@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { VideoInputSection } from '@/components/dashboard/VideoInputSection';
 import { EditorView } from '@/components/dashboard/EditorView';
+import { GlobalSearchBar } from '@/components/dashboard/GlobalSearchBar';
 import { Trash2 } from 'lucide-react';
 import { Clip } from '@/lib/video/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -40,7 +41,7 @@ export default function DashboardHome() {
 
     // Create project mutation
     const createProjectMutation = useMutation({
-        mutationFn: async (vars: { url: string; title: string }) => {
+        mutationFn: async (vars: { url: string; title: string; clips: Clip[] }) => {
             const res = await fetch('/api/projects', {
                 method: 'POST',
                 body: JSON.stringify(vars),
@@ -70,8 +71,7 @@ export default function DashboardHome() {
         },
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const activeProject = projects?.find((p: any) => p.id === activeProjectId);
+    const activeProject = projects?.find((p: { id: string; title: string; status: string }) => p.id === activeProjectId);
 
     const handleDelete = (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
@@ -82,20 +82,21 @@ export default function DashboardHome() {
 
     const handleVideoFound = (url: string, title: string, clips: Clip[]) => {
         setGeneratedClips(clips);
-        createProjectMutation.mutate({ url, title });
+        createProjectMutation.mutate({ url, title, clips });
     };
 
     return (
         <div className="flex flex-col min-h-[calc(100vh-100px)]">
             {!activeProjectId && generatedClips.length === 0 ? (
-                <div className="flex-1 flex flex-col justify-center">
+                <div className="flex-1 flex flex-col justify-center mt-12">
+                    <GlobalSearchBar />
+
                     <div className="mb-8 text-center">
                         {projects?.length > 0 && (
                             <div className="mb-8">
                                 <h3 className="text-lg font-medium text-white mb-4">Recent Projects</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto px-4">
-                                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                    {projects.map((p: any) => (
+                                    {projects.map((p: { id: string; title: string; status: string }) => (
                                         <div key={p.id} onClick={() => setActiveProjectId(p.id)} className="cursor-pointer bg-card/30 border border-border p-4 rounded-lg hover:bg-card/50 transition-colors text-left group relative">
                                             <h4 className="font-semibold text-white truncate pr-8">{p.title}</h4>
                                             <p className="text-xs text-muted-foreground mt-1 capitalize">{p.status}</p>

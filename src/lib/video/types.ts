@@ -15,4 +15,6 @@ export interface Clip {
     endTime: number;
     segments: { start: number; end: number }[];
     transcript: TranscriptSegment[];
+    speaker_timeline?: { start_time: number; end_time: number; position: number }[];
+    similarity?: number;
 }

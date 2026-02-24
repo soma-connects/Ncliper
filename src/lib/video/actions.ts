@@ -9,9 +9,26 @@ import { generateClipMetadata } from './metadata';
 import { generateImage } from './image-gen';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { Database } from '@/lib/supabase/types';
-import { SupabaseClient } from '@supabase/supabase-js';
 
-const supabase = supabaseAdmin as SupabaseClient<Database>;
+// Strict typing for yt-dlp JSON responses
+interface YtDlpSubtitle {
+    ext: string;
+    url: string;
+    name?: string;
+}
+
+export interface YtDlpVideoInfo {
+    id: string;
+    title?: string;
+    description?: string;
+    duration?: number;
+    thumbnails?: { url: string; preference?: number }[];
+    subtitles?: Record<string, YtDlpSubtitle[]>;
+    automatic_captions?: Record<string, YtDlpSubtitle[]>;
+    channel?: string;
+}
+
+const supabase = supabaseAdmin;
 
 // Helper types
 type ClipInsert = Database['public']['Tables']['clips']['Insert'];
@@ -28,7 +45,7 @@ async function fetchTranscript(url: string, ytDlpPath: string): Promise<string> 
         noWarnings: true,
         writeAutoSub: true,
         subLang: 'en',
-    }) as any;
+    }) as YtDlpVideoInfo;
 
     // 2. Find best subtitle URL (Manual > Auto)
     let subUrl = null;
@@ -37,7 +54,7 @@ async function fetchTranscript(url: string, ytDlpPath: string): Promise<string> 
     if (output.subtitles) {
         for (const lang of langs) {
             if (output.subtitles[lang]) {
-                const format = output.subtitles[lang].find((s: any) => s.ext === 'json3');
+                const format = output.subtitles[lang].find((s) => s.ext === 'json3');
                 if (format) {
                     subUrl = format.url;
                     break;
@@ -49,7 +66,7 @@ async function fetchTranscript(url: string, ytDlpPath: string): Promise<string> 
     if (!subUrl && output.automatic_captions) {
         for (const lang of langs) {
             if (output.automatic_captions[lang]) {
-                const format = output.automatic_captions[lang].find((s: any) => s.ext === 'json3');
+                const format = output.automatic_captions[lang].find((s) => s.ext === 'json3');
                 if (format) {
                     subUrl = format.url;
                     break;
@@ -76,9 +93,8 @@ async function fetchTranscript(url: string, ytDlpPath: string): Promise<string> 
     // JSON3 format: { events: [ { tStartMs, dDurationMs, segs: [ { utf8: "text" } ] } ] }
     let fullText = "";
     if (subJson.events) {
-        fullText = subJson.events
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .map((e: any) => e.segs ? e.segs.map((s: any) => s.utf8).join('') : '')
+        fullText = (subJson.events as { segs?: { utf8: string }[] }[])
+            .map((e) => e.segs ? e.segs.map((s) => s.utf8).join('') : '')
             .join(' ')
             .replace(/\s+/g, ' ')
             .trim();
@@ -106,16 +122,16 @@ export async function getVideoTitle(url: string, ytDlpPathArg?: string): Promise
             dumpSingleJson: true,
             noWarnings: true,
             preferFreeFormats: true,
-        }) as any;
+        }) as YtDlpVideoInfo;
 
         return { title: output.title };
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-        console.error("Error fetching video title:", error);
-        if (error.stderr) {
-            console.error("yt-dlp stderr:", error.stderr);
+    } catch (error: unknown) {
+        const err = error as Error & { stderr?: string };
+        console.error("Error fetching video title:", err);
+        if (err.stderr) {
+            console.error("yt-dlp stderr:", err.stderr);
         }
-        return { error: error.message || "Failed to fetch video title" };
+        return { error: err.message || "Failed to fetch video title" };
     }
 }
 
@@ -186,7 +202,8 @@ export async function getViralHooks(url: string) {
                 startTime: hook.start_time,
                 endTime: hook.end_time,
                 segments: hook.segments,
-                transcript: formattedTranscript
+                transcript: formattedTranscript,
+                speaker_timeline: hook.speaker_timeline || null
             };
         }));
 
@@ -209,7 +226,7 @@ async function fetchCaptions(url: string, ytDlpPath: string, startTime: number, 
         noWarnings: true,
         writeAutoSub: true,
         subLang: 'en',
-    }) as any;
+    }) as YtDlpVideoInfo;
 
     let subUrl = null;
     const langs = ['en', 'en-US', 'en-GB'];
@@ -300,7 +317,7 @@ async function fetchCaptions(url: string, ytDlpPath: string, startTime: number, 
     return timedWords;
 }
 
-export async function generateClip(url: string, segments: { start: number; end: number }[]) {
+export async function generateClip(url: string, segments: { start: number; end: number }[], speakerTimeline?: { start_time: number; end_time: number; position: number }[]) {
     try {
         if (!url) return { error: "URL is required" };
         if (!segments || segments.length === 0) return { error: "Segments are required" };
@@ -346,7 +363,7 @@ export async function generateClip(url: string, segments: { start: number; end: 
         const startTime = segments[0].start;
         const endTime = segments[0].end;
 
-        const clipPath = await createViralClip(url, startTime, endTime, captions);
+        const clipPath = await createViralClip(url, startTime, endTime, captions, speakerTimeline);
         return { path: clipPath };
     } catch (error: any) {
         console.error("Error generating clip:", error);
@@ -439,7 +456,8 @@ export async function processVideoForProject(projectId: string, videoUrl: string
         console.error("Process Video Error:", e);
         const failedUpdate: ProjectUpdate = { status: 'failed' };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase.from('projects') as any).update(failedUpdate).eq('id', projectId);
+        // @ts-ignore
+        await supabase.from('projects').update(failedUpdate).eq('id', projectId);
         return { error: e.message };
     }
 }
@@ -448,7 +466,8 @@ export async function getProjectClips(projectId: string) {
     try {
         // 1. Get Project URL (Main Video)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: project } = await (supabase.from('projects') as any)
+        // @ts-ignore
+        const { data: project } = await supabase.from('projects')
             .select('video_url')
             .eq('id', projectId)
             .single();
@@ -457,7 +476,7 @@ export async function getProjectClips(projectId: string) {
 
         // 2. Get Clips
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data, error } = await (supabase.from('clips') as any)
+        const { data, error } = await supabase.from('clips')
             .select('*')
             .eq('project_id', projectId)
             .order('created_at', { ascending: true });

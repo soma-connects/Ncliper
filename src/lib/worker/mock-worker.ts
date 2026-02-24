@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/supabase/types';
+import { saveClipEmbedding } from '@/lib/video/embeddings';
 
 /**
  * Mock Worker Service
@@ -34,16 +35,27 @@ export async function processJobMock(
         const clips = generateMockClips(jobId, videoUrl);
 
         // Insert Clips into DB
-        const { error: clipError } = await supabase
+        // We need to fetch back the inserted clips to get their generated UUIDs
+        const response = await supabase
             .from('clips')
             .insert(clips.map(clip => ({
                 ...clip,
                 user_id: userId, // Ensure ownership
                 job_id: jobId,
                 project_id: null // optional for now
-            })) as any);
+            })) as any)
+            .select() as { data: any[] | null, error: any };
 
-        if (clipError) throw new Error(`Failed to insert clips: ${clipError.message}`);
+        const insertedClips = response.data;
+        const clipError = response.error;
+
+        if (clipError || !insertedClips) throw new Error(`Failed to insert clips: ${clipError?.message}`);
+
+        console.log(`[MockWorker] Generating Semantic Search Embeddings for ${insertedClips.length} clips...`);
+        for (const insertedClip of insertedClips) {
+            const transcriptText = insertedClip.transcript_segment ? JSON.stringify(insertedClip.transcript_segment) : (insertedClip.description || insertedClip.title || "");
+            await saveClipEmbedding(insertedClip.id, transcriptText);
+        }
 
         // Step 4: Complete
         await updateJobStatus(supabase, jobId, 'completed', 'Job finished successfully.');
@@ -68,7 +80,7 @@ async function updateJobStatus(
 }
 
 function delay(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise<void>(resolve => setTimeout(resolve, ms));
 }
 
 function generateMockClips(jobId: string, originalVideoUrl: string) {

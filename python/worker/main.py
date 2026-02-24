@@ -36,7 +36,8 @@ def update_job_status(
     job_id: str, 
     status: str, 
     result_url: Optional[str] = None,
-    error: Optional[str] = None
+    error: Optional[str] = None,
+    message: Optional[str] = None
 ) -> None:
     """Update job status in Supabase database"""
     try:
@@ -51,6 +52,8 @@ def update_job_status(
             update_data["result_url"] = result_url
         if error:
             update_data["error"] = error
+        if message:
+            update_data["message"] = message
 
         supabase.table("jobs").update(update_data).eq("id", job_id).execute()
         print(f"[Worker] Updated job {job_id} status: {status}")
@@ -79,9 +82,10 @@ def process_video(job: Dict[str, Any]) -> Dict[str, Any]:
     
     try:
         # Update status to 'processing'
-        update_job_status(job_id, "processing")
+        update_job_status(job_id, "processing", message="Validating job configuration...")
         
         # Step 1: Download video and extract transcript
+        update_job_status(job_id, "processing", message="Downloading video and extracting transcript...")
         print(f"[Worker] [1/5] Downloading video...")
         video_file = download_and_extract_all(video_url, temp_dir)
         print(f"[Worker] ✅ Downloaded: {video_file.metadata.title}")
@@ -110,11 +114,13 @@ def process_video(job: Dict[str, Any]) -> Dict[str, Any]:
             print(f"[Worker] [2/5] Skipping face detection (video too long)")
         
         # Step 3: AI Analysis for viral hooks
+        update_job_status(job_id, "processing", message="Analyzing transcript for viral hooks using Gemini...")
         print(f"[Worker] [3/5] Analyzing with Gemini...")
         hooks = analyze_transcript(video_file.transcript)
         print(f"[Worker] ✅ Found {len(hooks)} viral hooks")
         
         # Step 4: Render clips
+        update_job_status(job_id, "processing", message=f"Rendering {len(hooks)} viral clips...")
         print(f"[Worker] [4/5] Rendering {len(hooks)} clips...")
         clips = []
         render_config = RenderConfig(
@@ -139,7 +145,8 @@ def process_video(job: Dict[str, Any]) -> Dict[str, Any]:
                     end_time=hook.end_time,
                     segments=segments,
                     crop_filter=crop_filter,
-                    config=render_config
+                    config=render_config,
+                    speaker_timeline=hook.speaker_timeline
                 )
             else:
                 # Single segment clip
@@ -149,7 +156,8 @@ def process_video(job: Dict[str, Any]) -> Dict[str, Any]:
                     start_time=hook.start_time,
                     end_time=hook.end_time,
                     crop_filter=crop_filter,
-                    config=render_config
+                    config=render_config,
+                    speaker_timeline=hook.speaker_timeline
                 )
             
             # Upload clip to R2
@@ -182,6 +190,7 @@ def process_video(job: Dict[str, Any]) -> Dict[str, Any]:
             
             print(f"[Worker]   ✅ Clip {i+1}: {hook.type} (score: {hook.virality_score})")
         
+        update_job_status(job_id, "processing", message="Saving final results to database...")
         print(f"[Worker] [5/5] Saving results to Supabase...")
         
         # Prepare result data
@@ -220,13 +229,17 @@ def process_video(job: Dict[str, Any]) -> Dict[str, Any]:
         pass  # Don't delete in Phase 2 for debugging
 
 
-def update_job_status(job_id: str, status: str) -> None:
+def update_job_status(job_id: str, status: str, message: Optional[str] = None) -> None:
     """Update job status in Supabase"""
     try:
-        result = supabase.table("jobs").update({
+        update_data = {
             "status": status,
             "updated_at": "now()"
-        }).eq("id", job_id).execute()
+        }
+        if message:
+            update_data["message"] = message
+            
+        result = supabase.table("jobs").update(update_data).eq("id", job_id).execute()
         
         if result.data:
             print(f"[Worker] Updated job {job_id} status to: {status}")

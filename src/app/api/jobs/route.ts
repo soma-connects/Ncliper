@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { invokeModalWorker } from '@/lib/worker/modal';
+import { getUserBalance, deductCredits } from '@/lib/billing/credits';
 import { Database } from '@/lib/supabase/types';
 import { SupabaseClient } from '@supabase/supabase-js';
 
@@ -24,6 +25,17 @@ const supabase = supabaseAdmin as SupabaseClient<Database>;
  *   message: string;
  * }
  */
+import { z } from 'zod';
+
+const jobRequestSchema = z.object({
+    video_url: z.string().url("Must be a valid video URL"),
+    settings: z.object({
+        clip_count: z.number().optional(),
+        duration_range: z.tuple([z.number(), z.number()]).optional(),
+        aspect_ratio: z.enum(['9:16', '16:9', '1:1']).optional(),
+    }).optional(),
+});
+
 export async function POST(req: NextRequest) {
     try {
         // 1. Authenticate user
@@ -37,22 +49,38 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. Parse request body
-        const body = await req.json();
-        const { video_url, settings } = body;
+        let rawBody;
+        try {
+            rawBody = await req.json();
+        } catch (e) {
+            return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+        }
 
-        if (!video_url || typeof video_url !== 'string') {
+        const parseResult = jobRequestSchema.safeParse(rawBody);
+
+        if (!parseResult.success) {
             return NextResponse.json(
-                { error: 'video_url is required' },
+                { error: 'Validation failed', details: parseResult.error.format() },
                 { status: 400 }
             );
         }
 
-        // 3. TODO: Check user credit balance
-        // const balance = await getCreditBalance(userId);
-        // const estimatedCost = calculateVideoCost(video_url); // Based on duration
-        // if (balance < estimatedCost) {
-        //   return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
-        // }
+        const { video_url, settings } = parseResult.data;
+
+        // 3. Check user credit balance
+        const balance = await getUserBalance(userId);
+
+        // Assume an average YouTube video is at least 10 minutes for this check.
+        // In reality, we should fetch YouTube metadata for exact length here, 
+        // but to stay fast, we'll do a soft check and then deduct the real amount later.
+        const minimumRequired = 10;
+
+        if (balance < minimumRequired) {
+            return NextResponse.json(
+                { error: `Insufficient credits. You have ${balance} but need at least ${minimumRequired} to start a job.` },
+                { status: 402 }
+            );
+        }
 
         // 4. Create job record in database
         const jobInsert: Database['public']['Tables']['jobs']['Insert'] = {
@@ -80,7 +108,7 @@ export async function POST(req: NextRequest) {
         // We run the download/upload locally to use residential IP, then invoke Modal
         (async () => {
             try {
-                console.log(`[API] Starting Pipeline for job ${(jobRecord as any).id}`);
+                console.log(`[API] Starting Pipeline for job ${jobRecord.id}`);
 
                 const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
                 let r2Url = undefined;
@@ -92,7 +120,7 @@ export async function POST(req: NextRequest) {
 
                     // 5a. Local Download (Bypasses YouTube blocking)
                     console.log('[API] Step 1: Downloading locally (Residential IP Bypass)...');
-                    filePath = await downloadVideoLocally(video_url, (jobRecord as any).id);
+                    filePath = await downloadVideoLocally(video_url, String((jobRecord as any).id));
 
                     // 5b. Upload to R2
                     console.log('[API] Step 2: Uploading to R2...');
@@ -109,7 +137,7 @@ export async function POST(req: NextRequest) {
                     const { processJobMock } = await import('@/lib/worker/mock-worker');
                     // Run mock processing (async, don't await)
                     processJobMock(
-                        (jobRecord as any).id,
+                        String((jobRecord as any).id),
                         video_url,
                         userId,
                         supabase
@@ -117,8 +145,8 @@ export async function POST(req: NextRequest) {
                 } else {
                     console.log('[API] Step 3: Invoking Modal Worker...');
                     const modalParams = {
-                        job_id: (jobRecord as any).id,
-                        project_id: (jobRecord as any).settings?.project_id || '',
+                        job_id: String((jobRecord as any).id),
+                        project_id: (((jobRecord as any).settings as any) || {}).project_id || '',
                         video_url, // Keep original URL for metadata
                         settings: {
                             width: settings?.aspect_ratio === '1:1' ? 1080 : 1080,
@@ -139,16 +167,31 @@ export async function POST(req: NextRequest) {
                     }
                 }
 
+                // 5d. Deduct Credits
+                // For now, we deduct a flat estimated amount of 10 credits.
+                // In a perfect system, the worker would report the exact duration back
+                // to the database and a webhook would handle the precise deduction.
+                const estimatedCost = 10;
+                await deductCredits(
+                    userId,
+                    estimatedCost,
+                    'video_processing',
+                    `Processed video (Job ${(jobRecord as any).id})`,
+                    String((jobRecord as any).id),
+                    true // Force deduction even if it sends them slightly negative
+                );
+                console.log(`[API] Deducted ${estimatedCost} credits for Job ${(jobRecord as any).id}`);
+
             } catch (error: any) {
                 console.error('[API] Hybrid Pipeline failed:', error);
                 // Update job status to failed
-                const updateData: Database['public']['Tables']['jobs']['Update'] = {
+                const updateData = {
                     status: 'failed',
                     error: error.message || 'Pipeline failed'
                 };
                 await supabase
                     .from('jobs')
-                    .update(updateData)
+                    .update(updateData as any)
                     .eq('id', (jobRecord as any).id);
             }
         })();

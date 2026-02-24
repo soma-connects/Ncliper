@@ -46,6 +46,20 @@ const hookSchema = {
                 type: SchemaType.STRING,
                 description: "Type of hook detected: 'Pattern Interrupt', 'High-Retention Hook', etc.",
                 nullable: false
+            },
+            speaker_timeline: {
+                type: SchemaType.ARRAY,
+                description: "Timeline of the active speaker's position on screen (0.0 to 1.0, where 0 is left, 0.5 is center, 1.0 is right edge). Must cover the entire segment duration.",
+                items: {
+                    type: SchemaType.OBJECT,
+                    properties: {
+                        start_time: { type: SchemaType.NUMBER, nullable: false },
+                        end_time: { type: SchemaType.NUMBER, nullable: false },
+                        position: { type: SchemaType.NUMBER, description: "0.0 for Left Speaker, 0.5 for Center/Solo Speaker, 1.0 for Right Speaker", nullable: false }
+                    },
+                    required: ["start_time", "end_time", "position"]
+                },
+                nullable: true
             }
         },
         required: ["start_time", "end_time", "segments", "virality_score", "type"],
@@ -138,6 +152,15 @@ export const analyzeTranscript = async (transcript: string) => {
   - Segments MUST start at the beginning of a complete sentence or a clear visual cut. 
   - Do NOT start mid-sentence. 
   - Verify timestamp precision to 0.1s.
+
+  **SPEAKER DIARIZATION (CRITICAL FOR PODCASTS)**:
+  - If there are multiple active speakers (e.g., a podcast format), you must generate a \`speaker_timeline\`.
+  - For each segment, output the \`start_time\` and \`end_time\` of who is actively talking, and their \`position\` on screen.
+  - \`position\` values MUST be:
+      - \`0.0\` if the speaker is on the LEFT side of the screen.
+      - \`1.0\` if the speaker is on the RIGHT side of the screen.
+      - \`0.5\` if there is only one center speaker, or both are speaking/visible center.
+  - The sum of \`speaker_timeline\` segments must cover the entire combined duration of the \`segments\`.
 
   Content Types:
   1. "The Deep Dive": Explain a concept fully. (Hormozi Style: Hook -> Value -> Value -> CTA)

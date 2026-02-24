@@ -29,8 +29,10 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "server-only": "^0.0.1",
+    "svix": "^1.86.0",
     "tailwind-merge": "^3.4.0",
-    "youtube-dl-exec": "^3.0.29"
+    "youtube-dl-exec": "^3.0.29",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

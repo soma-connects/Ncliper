@@ -81,12 +81,12 @@ export const extractFrame = async (videoUrl: string, timestamp: number): Promise
 
 // ...
 
-export const createViralClip = async (videoUrl: string, startTime: number, endTime: number, captions: CaptionChunk[] = []): Promise<string> => {
+export const createViralClip = async (videoUrl: string, startTime: number, endTime: number, captions: CaptionChunk[] = [], speakerTimeline?: { start_time: number; end_time: number; position: number }[]): Promise<string> => {
     return new Promise(async (resolve, reject) => {
         try {
             // Generate a unique ID based on parameters to enable caching
             const paramsHash = crypto.createHash('md5')
-                .update(`${videoUrl}-${startTime}-${endTime}-${JSON.stringify(captions)}`)
+                .update(`${videoUrl}-${startTime}-${endTime}-${JSON.stringify(captions)}-${JSON.stringify(speakerTimeline || [])}`)
                 .digest('hex');
 
             const fileName = `clip_${paramsHash}.mp4`;
@@ -127,9 +127,41 @@ export const createViralClip = async (videoUrl: string, startTime: number, endTi
             // Then crop to 720:1280 (9:16).
             complexFilters.push('[bg]scale=-1:1280,crop=720:1280:(iw-720)/2:0,boxblur=20:10[bg_blurred]');
 
-            // 3. Foreground Chain: Scale to fit 720 width (preserving aspect)
-            // scale=720:-1 force width to 720, height auto
-            complexFilters.push('[fg]scale=720:-1[fg_scaled]');
+            // 3. Foreground Chain: Scale to full height (1280), dynamically crop width to 720 tracking speaker.
+            // If speakerTimeline is provided, we build a dynamic expression for X.
+            // Output aspect ratio is 9:16 -> 720:1280
+            // Original video is scaled so height is 1280. We need to slide a 720px window horizontally.
+            let cropExpr = '(iw-720)/2'; // Default center crop
+
+            if (speakerTimeline && speakerTimeline.length > 0) {
+                // Build nested if expressions for FFmpeg: 
+                // if(between(t, start, end), (iw-720)*position, if(..., default))
+                // Note: speakerTimeline timestamps are relative to 0 for the whole video, 
+                // but FFmpeg 't' will be relative to 0 since we seek input.
+                // We must shift timeline relative to `startTime`.
+
+                let expr = '(iw-720)/2'; // fallback
+                // Build backwards so the first segment is the outermost 'if'
+                for (let i = speakerTimeline.length - 1; i >= 0; i--) {
+                    const seg = speakerTimeline[i];
+                    // shift timestamps relative to start of clip rendering
+                    const relStart = Math.max(0, seg.start_time - startTime);
+                    const relEnd = seg.end_time - startTime;
+                    if (relEnd < 0) continue;
+
+                    // position: 0 (left) -> x=0
+                    // position: 1 (right) -> x=iw-720
+                    // Position mapping formula: (iw-720) * position
+                    const xPos = `(iw-720)*${seg.position}`;
+
+                    expr = `if(between(t,${relStart},${relEnd}),${xPos},${expr})`;
+                }
+                cropExpr = expr;
+            }
+
+            // Note: scale=1280:-1 is wrong for horizontal videos, we want scale=-1:1280 height, width proportional
+            // Then we crop out 720x1280 from that scaled version.
+            complexFilters.push(`[fg]scale=-1:1280,crop=720:1280:'${cropExpr}':0[fg_scaled]`);
 
             // 4. Overlay [fg] onto [bg] at center
             complexFilters.push('[bg_blurred][fg_scaled]overlay=(W-w)/2:(H-h)/2[out_v]');
