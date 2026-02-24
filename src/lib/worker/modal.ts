@@ -4,8 +4,6 @@
  */
 
 // Modal function details
-const MODAL_APP_NAME = "ncliper-worker";
-const MODAL_FUNCTION_NAME = "process_video";
 
 export interface ModalProcessVideoParams {
     job_id: string;

@@ -38,12 +38,14 @@ export async function processJobMock(
         // We need to fetch back the inserted clips to get their generated UUIDs
         const response = await supabase
             .from('clips')
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .insert(clips.map(clip => ({
                 ...clip,
                 user_id: userId, // Ensure ownership
                 job_id: jobId,
                 project_id: null // optional for now
             })) as any)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .select() as { data: any[] | null, error: any };
 
         const insertedClips = response.data;
@@ -61,6 +63,7 @@ export async function processJobMock(
         await updateJobStatus(supabase, jobId, 'completed', 'Job finished successfully.');
         console.log(`[MockWorker] Job ${jobId} completed!`);
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         console.error(`[MockWorker] Job ${jobId} failed:`, error);
         await updateJobStatus(supabase, jobId, 'failed', error.message);
@@ -75,6 +78,7 @@ async function updateJobStatus(
 ) {
     await supabase
         .from('jobs')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .update({ status, message } as any)
         .eq('id', jobId);
 }
