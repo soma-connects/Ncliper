@@ -7,7 +7,7 @@ export async function getUserBalance(userId: string): Promise<number> {
     try {
         if (!userId) return 0;
 
-        const { data, error } = await supabase.rpc('get_user_balance', {
+        const { data, error } = await (supabase.rpc as any)('get_user_balance', {
             user_uid: userId
         });
 
