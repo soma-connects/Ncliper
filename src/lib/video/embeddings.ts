@@ -40,6 +40,7 @@ export async function saveClipEmbedding(clipId: string, transcriptText: string):
         const embedding = await generateTextEmbedding(transcriptText);
         if (!embedding) return false;
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { error } = await (supabase.from('embeddings') as any)
             .upsert({
                 clip_id: clipId,
@@ -74,6 +75,7 @@ export async function searchSemanticClips(query: string, userId: string, thresho
         // Convert the number array to a pgvector string format '[0.1, 0.2, ...]'
         const vectorString = `[${queryEmbedding.join(',')}]`;
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: matches, error } = await (supabaseAdmin.rpc as any)('match_clips', {
             query_embedding: vectorString,
             match_threshold: threshold,
@@ -88,6 +90,7 @@ export async function searchSemanticClips(query: string, userId: string, thresho
 
         return { clips: matches || [] };
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         console.error('[Embeddings] Semantic search error:', error);
         return { error: error.message || 'Search execution failed' };
