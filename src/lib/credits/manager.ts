@@ -10,8 +10,9 @@ type CreditLedgerInsert = Database['public']['Tables']['credit_ledger']['Insert'
 export async function getCreditBalance(userId: string): Promise<number> {
     try {
         // Use the database function for efficient aggregation
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data, error } = await supabaseAdmin
-            .rpc('get_credit_balance', { p_user_id: userId });
+            .rpc('get_credit_balance', { p_user_id: userId } as any);
 
         if (error) {
             console.error('[Credits] Failed to get balance:', error);
@@ -51,8 +52,8 @@ export async function deductCredits(
             related_job_id: jobId,
         };
 
-        const { error } = await supabaseAdmin
-            .from('credit_ledger')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await (supabaseAdmin.from('credit_ledger') as any)
             .insert(ledgerEntry);
 
         if (error) {
@@ -86,8 +87,8 @@ export async function grantCredits(
             description: description || `Credit grant (${amount} credits)`,
         };
 
-        const { error } = await supabaseAdmin
-            .from('credit_ledger')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await (supabaseAdmin.from('credit_ledger') as any)
             .insert(ledgerEntry);
 
         if (error) {
@@ -120,8 +121,8 @@ export async function getCreditHistory(
     limit: number = 50
 ) {
     try {
-        const { data, error } = await supabaseAdmin
-            .from('credit_ledger')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data, error } = await (supabaseAdmin.from('credit_ledger') as any)
             .select('*')
             .eq('user_id', userId)
             .order('created_at', { ascending: false })

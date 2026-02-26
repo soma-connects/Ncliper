@@ -1,7 +1,7 @@
 
 import { generateClipMetadata } from '../src/lib/video/metadata';
 import { generateImage } from '../src/lib/video/image-gen';
-import { extractFrame } from '../src/lib/video/processor';
+// Removed unused extractFrame
 
 // Mock dependencies
 jest.mock('@google/generative-ai', () => ({
@@ -59,7 +59,7 @@ describe('Thumbnail System Modules', () => {
         expect(response).toBeDefined();
         // The response from generateImage should be the Gemini response object
         // Check that it has the expected structure from our mock
-        const mockResponse = response as any;
+        const mockResponse = response as { response?: { text: () => string } };
         if (mockResponse?.response?.text) {
             const jsonText = mockResponse.response.text();
             expect(jsonText).toContain("Test Viral Title");

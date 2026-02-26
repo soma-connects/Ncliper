@@ -1,12 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, Loader2, Play } from 'lucide-react';
+import { Search, Loader2 } from 'lucide-react';
 import { Clip } from '@/lib/video/types';
-import { useAuth } from '@clerk/nextjs';
 
 export function GlobalSearchBar() {
-    const { getToken } = useAuth();
     const [query, setQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
     const [results, setResults] = useState<Clip[] | null>(null);
@@ -35,7 +33,7 @@ export function GlobalSearchBar() {
 
             const data = await res.json();
             setResults(data.clips || []);
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
             setError('Failed to search clips. Please try again.');
         } finally {

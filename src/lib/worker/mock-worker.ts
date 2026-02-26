@@ -76,10 +76,9 @@ async function updateJobStatus(
     status: 'queued' | 'processing' | 'completed' | 'failed',
     message?: string
 ) {
-    await supabase
-        .from('jobs')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .update({ status, message } as any)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('jobs') as any)
+        .update({ status, message })
         .eq('id', jobId);
 }
 

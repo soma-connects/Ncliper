@@ -17,6 +17,7 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [progress, setProgress] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [loadError, setLoadError] = useState(false);
 
     // Detect video source type

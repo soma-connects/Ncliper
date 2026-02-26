@@ -48,8 +48,8 @@ export function PromptToClipBar({ projectId, onMatchSelect }: PromptToClipBarPro
             if (data.matches && data.matches.length > 0) {
                 onMatchSelect(data.matches[0]);
             }
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Unknown error');
         } finally {
             setIsSearching(false);
         }
@@ -98,7 +98,7 @@ export function PromptToClipBar({ projectId, onMatchSelect }: PromptToClipBarPro
             {matches.length > 0 && (
                 <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
                     <p className="text-xs text-muted-foreground px-1">
-                        Found {matches.length} moment{matches.length > 1 ? 's' : ''} matching "{query}"
+                        Found {matches.length} moment{matches.length > 1 ? 's' : ''} matching &quot;{query}&quot;
                     </p>
                     <div className="flex flex-wrap gap-2">
                         {matches.map((match, idx) => (

@@ -10,6 +10,7 @@ import { generateClip } from "@/lib/video/actions";
 
 
 // Enhanced Mock Data
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const MOCK_CLIPS: Clip[] = [
     {
         id: 1,

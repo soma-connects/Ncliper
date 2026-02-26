@@ -83,8 +83,8 @@ export function VideoInputSection({ onVideoFound, isLoading = false }: VideoInpu
             setStatusMessage("Job submitted! Starting processing...");
             setCurrentJobId(job_id); // This triggers the polling hook
 
-        } catch (err: any) {
-            setError(err.message || "Something went wrong");
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Something went wrong");
             setLocalLoading(false);
             setStatusMessage("");
         }

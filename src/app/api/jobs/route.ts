@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
         let rawBody;
         try {
             rawBody = await req.json();
-        } catch (e) {
+        } catch (_e) {
             return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
         }
 
@@ -90,11 +90,14 @@ export async function POST(req: NextRequest) {
             settings: settings || null,
         };
 
-        const { data: jobRecord, error: dbError } = await supabase
+        const { data: jobRecordRaw, error: dbError } = await supabase
             .from('jobs')
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .insert(jobInsert as any) // Type assertion: table exists but TS cache needs refresh
             .select()
             .single();
+
+        const jobRecord = (jobRecordRaw as unknown) as { id: string, settings: { project_id?: string } | null };
 
         if (dbError || !jobRecord) {
             console.error('[API] Failed to create job record:', dbError);
@@ -120,11 +123,11 @@ export async function POST(req: NextRequest) {
 
                     // 5a. Local Download (Bypasses YouTube blocking)
                     console.log('[API] Step 1: Downloading locally (Residential IP Bypass)...');
-                    filePath = await downloadVideoLocally(video_url, String((jobRecord as any).id));
+                    filePath = await downloadVideoLocally(video_url, String(jobRecord.id));
 
                     // 5b. Upload to R2
                     console.log('[API] Step 2: Uploading to R2...');
-                    const r2Key = `raw/${(jobRecord as any).id}.mp4`;
+                    const r2Key = `raw/${jobRecord.id}.mp4`;
                     r2Url = await uploadToR2(filePath, r2Key);
                     console.log(`[API] R2 URL: ${r2Url}`);
                 } else {
@@ -137,7 +140,7 @@ export async function POST(req: NextRequest) {
                     const { processJobMock } = await import('@/lib/worker/mock-worker');
                     // Run mock processing (async, don't await)
                     processJobMock(
-                        String((jobRecord as any).id),
+                        String(jobRecord.id),
                         video_url,
                         userId,
                         supabase
@@ -145,8 +148,8 @@ export async function POST(req: NextRequest) {
                 } else {
                     console.log('[API] Step 3: Invoking Modal Worker...');
                     const modalParams = {
-                        job_id: String((jobRecord as any).id),
-                        project_id: (((jobRecord as any).settings as any) || {}).project_id || '',
+                        job_id: String(jobRecord.id),
+                        project_id: jobRecord.settings?.project_id || '',
                         video_url, // Keep original URL for metadata
                         settings: {
                             width: settings?.aspect_ratio === '1:1' ? 1080 : 1080,
@@ -176,30 +179,31 @@ export async function POST(req: NextRequest) {
                     userId,
                     estimatedCost,
                     'video_processing',
-                    `Processed video (Job ${(jobRecord as any).id})`,
-                    String((jobRecord as any).id),
+                    `Processed video (Job ${jobRecord.id})`,
+                    String(jobRecord.id),
                     true // Force deduction even if it sends them slightly negative
                 );
-                console.log(`[API] Deducted ${estimatedCost} credits for Job ${(jobRecord as any).id}`);
+                console.log(`[API] Deducted ${estimatedCost} credits for Job ${jobRecord.id}`);
 
-            } catch (error: any) {
+            } catch (error) {
                 console.error('[API] Hybrid Pipeline failed:', error);
                 // Update job status to failed
                 const updateData = {
                     status: 'failed',
-                    error: error.message || 'Pipeline failed'
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    error: (error as any).message || 'Pipeline failed'
                 };
-                await supabase
-                    .from('jobs')
-                    .update(updateData as any)
-                    .eq('id', (jobRecord as any).id);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await (supabase.from('jobs') as any)
+                    .update(updateData)
+                    .eq('id', jobRecord.id);
             }
         })();
 
         // 6. Return job ID immediately (202 Accepted - processing async)
         return NextResponse.json(
             {
-                job_id: (jobRecord as any).id,
+                job_id: jobRecord.id,
                 status: 'queued',
                 message: 'Job queued successfully. Poll /api/jobs/{id} for status.',
             },

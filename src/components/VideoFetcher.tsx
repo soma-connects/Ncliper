@@ -20,13 +20,11 @@ export default function VideoFetcher() {
     const [transcript, setTranscript] = useState<string>("");
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
-    const [analyzing, setAnalyzing] = useState(false);
 
     const handleFetch = async () => {
         if (!url) return;
 
         setLoading(true);
-        setAnalyzing(true);
         setError(null);
         setTitle(null);
         setHooks([]);
@@ -38,7 +36,6 @@ export default function VideoFetcher() {
             if (titleRes.error) {
                 setError(titleRes.error);
                 setLoading(false);
-                setAnalyzing(false);
                 return;
             }
             setTitle(titleRes.title || "Unknown Title");
@@ -50,6 +47,7 @@ export default function VideoFetcher() {
                 setError(hooksRes.error);
             } else if (hooksRes.clips) {
                 // Map clips to hooks format for this component
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const mappedHooks = hooksRes.clips.map((clip: any) => ({
                     start_time: clip.startTime,
                     end_time: clip.endTime,
@@ -62,18 +60,19 @@ export default function VideoFetcher() {
                 // Extract transcript from first clip if available
                 if (hooksRes.clips[0]?.transcript) {
                     const fullTranscript = hooksRes.clips
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         .flatMap((c: any) => c.transcript || [])
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         .map((t: any) => t.text)
                         .join(' ');
                     setTranscript(fullTranscript);
                 }
             }
 
-        } catch (_err) {
+        } catch {
             setError("An unexpected error occurred.");
         } finally {
             setLoading(false);
-            setAnalyzing(false);
         }
     };
 

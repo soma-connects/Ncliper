@@ -64,8 +64,8 @@ export function useJobPolling(jobId: string | null) {
                 if (result.status === 'completed' || result.status === 'failed') {
                     setIsPolling(false);
                 }
-            } catch (err: any) {
-                if (isMounted) setError(err.message || 'Initial fetch failed');
+            } catch (err: unknown) {
+                if (isMounted) setError(err instanceof Error ? err.message : 'Initial fetch failed');
             }
         };
 

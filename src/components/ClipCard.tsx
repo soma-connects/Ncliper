@@ -28,7 +28,6 @@ export default function ClipCard({
     transcriptSegment,
     status = 'idle',
     progress = 0,
-    downloadUrl,
     onGenerate,
     onDownload
 }: ClipCardProps) {

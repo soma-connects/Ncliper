@@ -14,8 +14,9 @@ export async function POST(request: Request) {
         const { title, url, clips } = body;
 
         // 1. Create the project
-        const { data: project, error } = await supabase
+        const { data: projectRaw, error } = await supabase
             .from('projects')
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .insert({
                 title,
                 video_url: url,
@@ -25,12 +26,15 @@ export async function POST(request: Request) {
             .select()
             .single();
 
+        const project = (projectRaw as unknown) as { id: string };
+
         if (error) throw error;
 
         // 2. If clips are provided, insert them and generate embeddings
         if (clips && Array.isArray(clips) && clips.length > 0) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const clipsToInsert = clips.map((clip: any) => ({
-                project_id: (project as any).id,
+                project_id: project.id,
                 title: clip.title,
                 start_time: clip.startTime || clip.start_time || 0,
                 end_time: clip.endTime || clip.end_time || 0,
@@ -41,6 +45,7 @@ export async function POST(request: Request) {
 
             const { data: insertedClips, error: insertError } = await supabase
                 .from('clips')
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 .insert(clipsToInsert as any)
                 .select();
 
@@ -49,6 +54,7 @@ export async function POST(request: Request) {
             } else if (insertedClips && insertedClips.length > 0) {
                 console.log(`[API] Saved ${insertedClips.length} clips. Generating semantic embeddings...`);
                 // Generate embeddings asynchronously (fire and forget)
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 Promise.all(insertedClips.map((clip: any) => {
                     // Extract text context for vector embedding
                     const text = clip.transcript_segment
@@ -56,7 +62,7 @@ export async function POST(request: Request) {
                         : clip.title;
                     return saveClipEmbedding(clip.id, text);
                 })).then(() => {
-                    console.log(`[API] Finished generating embeddings for Project ${(project as any).id}.`);
+                    console.log(`[API] Finished generating embeddings for Project ${project.id}.`);
                 }).catch(err => {
                     console.error("[API] Background embedding generation failed:", err);
                 });
@@ -65,22 +71,25 @@ export async function POST(request: Request) {
             // Fallback for backwards compatibility if a project is created without clips
             console.log("[API] No clips provided, starting async Modal worker fallback...");
             try {
-                const { data: job, error: jobError } = await supabase
+                const { data: jobRaw, error: jobError } = await supabase
                     .from('jobs')
                     .insert({
                         user_id: userId,
                         video_url: url,
                         status: 'queued',
-                        settings: { project_id: (project as any).id }
+                        settings: { project_id: project.id }
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     } as any)
                     .select()
                     .single();
 
+                const job = (jobRaw as unknown) as { id: string };
+
                 if (!jobError && job) {
                     const { invokeModalWorker } = await import('@/lib/worker/modal');
                     invokeModalWorker({
-                        job_id: (job as any).id,
-                        project_id: (project as any).id,
+                        job_id: job.id,
+                        project_id: project.id,
                         video_url: url,
                         settings: { clip_count: 3 }
                     }).catch(err => console.error("Worker invocation failed:", err));
@@ -97,7 +106,7 @@ export async function POST(request: Request) {
     }
 }
 
-export async function GET(request: Request) {
+export async function GET(_request: Request) {
     try {
         const { userId } = await auth();
         if (!userId) {

@@ -10,6 +10,7 @@ interface TranscriptEditorProps {
 export function TranscriptEditor({ transcript: initialTranscript = [] }: TranscriptEditorProps) {
     const [transcript, setTranscript] = useState<TranscriptSegment[]>(initialTranscript);
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [currentTime, setCurrentTime] = useState(0); // This would be synced with player in a real app
 
     // Only update when transcript actually changes (deep comparison)
@@ -26,6 +27,7 @@ export function TranscriptEditor({ transcript: initialTranscript = [] }: Transcr
         setTranscript(newTranscript);
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
         if (e.key === 'Enter') {
             e.preventDefault();

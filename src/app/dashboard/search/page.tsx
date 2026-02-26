@@ -44,8 +44,8 @@ export default function SearchResultsPage() {
 
                 const data = await response.json();
                 setResults(data.clips || []);
-            } catch (err: any) {
-                setError(err.message);
+            } catch (err: unknown) {
+                setError(err instanceof Error ? err.message : 'Unknown error');
             } finally {
                 setIsLoading(false);
             }
@@ -58,7 +58,7 @@ export default function SearchResultsPage() {
         <div className="p-8 max-w-7xl mx-auto">
             <h1 className="text-3xl font-bold text-white mb-2">Search Results</h1>
             <p className="text-muted-foreground mb-8">
-                Showing semantic matches for: <span className="text-white font-medium">"{query}"</span>
+                Showing semantic matches for: <span className="text-white font-medium">&quot;{query}&quot;</span>
             </p>
 
             {isLoading && (
@@ -77,7 +77,7 @@ export default function SearchResultsPage() {
 
             {!isLoading && !error && results.length === 0 && query && (
                 <div className="text-center py-20 border border-dashed border-border rounded-xl bg-card/10">
-                    <p className="text-lg text-muted-foreground">No matches found for "{query}".</p>
+                    <p className="text-lg text-muted-foreground">No matches found for &quot;{query}&quot;.</p>
                     <p className="text-sm text-muted-foreground/70 mt-2">Try describing the clip differently.</p>
                 </div>
             )}

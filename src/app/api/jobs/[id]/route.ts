@@ -56,7 +56,7 @@ export async function GET(
             status: job.status,
             created_at: job.created_at,
             result_data: job.result_data || null, // Return processed clips when complete
-            result_url: (job.result_data as any)?.result_url || null, // Legacy field
+            result_url: (job.result_data as { result_url?: string })?.result_url || null, // Legacy field
             error: job.error || null,
             settings: job.settings || null,
         });

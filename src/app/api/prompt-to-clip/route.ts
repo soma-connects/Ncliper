@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
         let rawBody;
         try {
             rawBody = await req.json();
-        } catch (e) {
+        } catch (_e) {
             return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
         }
 
@@ -101,10 +101,12 @@ export async function POST(req: NextRequest) {
             }
 
             // Combine all transcript segments into one string with timestamps
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             transcript = clips.map((clip: any) => {
                 if (clip.transcript_segment) {
                     if (typeof clip.transcript_segment === 'string') return clip.transcript_segment;
                     if (Array.isArray(clip.transcript_segment)) {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         return clip.transcript_segment.map((s: any) => `[${s.start || clip.start_time}s] ${s.text || s.utf8 || ''}`).join('\n');
                     }
                 }
@@ -121,6 +123,7 @@ export async function POST(req: NextRequest) {
             model: 'gemini-2.0-flash',
             generationConfig: {
                 responseMimeType: 'application/json',
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 responseSchema: matchSchema as any,
                 temperature: 0.2, // Low creativity for precision
             },
@@ -155,6 +158,7 @@ INSTRUCTIONS:
 
         return NextResponse.json({ matches });
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         console.error('[PromptToClip] Error:', error);
         return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });

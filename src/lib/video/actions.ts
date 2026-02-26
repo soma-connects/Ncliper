@@ -209,9 +209,9 @@ export async function getViralHooks(url: string) {
 
         return { clips };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error analyzing viral hooks:", error);
-        return { error: error.message || "Failed to analyze video" };
+        return { error: error instanceof Error ? error.message : "Failed to analyze video" };
     }
 }
 
@@ -234,6 +234,7 @@ async function fetchCaptions(url: string, ytDlpPath: string, startTime: number, 
     if (output.subtitles) {
         for (const lang of langs) {
             if (output.subtitles[lang]) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const format = output.subtitles[lang].find((s: any) => s.ext === 'json3');
                 if (format) { subUrl = format.url; break; }
             }
@@ -243,6 +244,7 @@ async function fetchCaptions(url: string, ytDlpPath: string, startTime: number, 
     if (!subUrl && output.automatic_captions) {
         for (const lang of langs) {
             if (output.automatic_captions[lang]) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const format = output.automatic_captions[lang].find((s: any) => s.ext === 'json3');
                 if (format) { subUrl = format.url; break; }
             }
@@ -290,6 +292,7 @@ async function fetchCaptions(url: string, ytDlpPath: string, startTime: number, 
     rawWords.sort((a, b) => a.start - b.start);
 
     // Calculate durations based on next word
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const timedWords: any[] = [];
     for (let i = 0; i < rawWords.length; i++) {
         const word = rawWords[i];
@@ -326,12 +329,14 @@ export async function generateClip(url: string, segments: { start: number; end: 
         const isWindows = typeof process !== 'undefined' && process.platform === 'win32';
         const ytDlpPath = path.join(process.cwd(), 'node_modules', 'youtube-dl-exec', 'bin', isWindows ? 'yt-dlp.exe' : 'yt-dlp');
 
-        let mergedCaptions: any[] = [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mergedCaptions: any[] = [];
         let currentOutputTime = 0;
 
         // Fetch and re-time captions for each segment
         for (const segment of segments) {
             const segDuration = segment.end - segment.start;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             let segCaptions: any[] = [];
 
             try {
@@ -354,6 +359,7 @@ export async function generateClip(url: string, segments: { start: number; end: 
 
         const totalDuration = currentOutputTime;
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let captions: any[] = [];
         if (mergedCaptions.length > 0) {
             captions = generateCaptionChunks(mergedCaptions, totalDuration);
@@ -365,7 +371,7 @@ export async function generateClip(url: string, segments: { start: number; end: 
 
         const clipPath = await createViralClip(url, startTime, endTime, captions, speakerTimeline);
         return { path: clipPath };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error generating clip:", error);
         return { error: "Failed to create viral clip. Ensure FFmpeg is installed." };
     }
@@ -378,7 +384,7 @@ export async function generateMetadataAction(transcript: string) {
         const metadataJson = await generateClipMetadata(transcript);
         const cleaned = metadataJson.replace(/```json/g, '').replace(/```/g, '').trim();
         return { metadata: JSON.parse(cleaned) };
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error("Metadata Action Error:", e);
         return { error: "Failed to generate metadata" };
     }
@@ -388,7 +394,7 @@ export async function generateThumbnailFrameAction(videoUrl: string, timestamp: 
     try {
         const path = await extractFrame(videoUrl, timestamp);
         return { path };
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error("Frame Extractor Error:", e);
         return { error: "Failed to extract frame" };
     }
@@ -402,7 +408,7 @@ export async function generateAIThumbnailAction(prompt: string) {
         // Return result assuming it's usable or placeholder if logic incomplete
         // For MVP we might need to verify what 'result' is in browser console
         return { result };
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error("AI Thumbnail Error:", e);
         return { error: "Failed to generate AI thumbnail" };
     }
@@ -452,13 +458,12 @@ export async function processVideoForProject(projectId: string, videoUrl: string
 
         return { success: true, count: clipsToInsert.length };
 
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error("Process Video Error:", e);
         const failedUpdate: ProjectUpdate = { status: 'failed' };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        // @ts-ignore
-        await supabase.from('projects').update(failedUpdate).eq('id', projectId);
-        return { error: e.message };
+        await (supabase.from('projects') as any).update(failedUpdate).eq('id', projectId);
+        return { error: e instanceof Error ? e.message : "Processing failed" };
     }
 }
 
@@ -466,8 +471,7 @@ export async function getProjectClips(projectId: string) {
     try {
         // 1. Get Project URL (Main Video)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        // @ts-ignore
-        const { data: project } = await supabase.from('projects')
+        const { data: project } = await (supabase.from('projects') as any)
             .select('video_url')
             .eq('id', projectId)
             .single();
@@ -475,7 +479,6 @@ export async function getProjectClips(projectId: string) {
         const projectVideoUrl = project?.video_url || '';
 
         // 2. Get Clips
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data, error } = await supabase.from('clips')
             .select('*')
             .eq('project_id', projectId)
