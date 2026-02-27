@@ -150,6 +150,7 @@ export default function ClipCard({
             {/* Thumbnail Preview */}
             {thumbnailUrl && (
                 <div className="mb-4 relative aspect-video rounded-lg overflow-hidden bg-black group-thumb">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={thumbnailUrl} alt="Thumbnail" className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-thumb-hover:opacity-100 flex items-center justify-center transition-opacity">
                         <a href={thumbnailUrl} download className="text-white text-xs font-bold border border-white px-3 py-1 rounded-full hover:bg-white hover:text-black transition-colors">

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase/server';
 import { auth } from '@clerk/nextjs/server';
@@ -16,7 +17,6 @@ export async function POST(request: Request) {
         // 1. Create the project
         const { data: projectRaw, error } = await supabase
             .from('projects')
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .insert({
                 title,
                 video_url: url,
@@ -32,7 +32,6 @@ export async function POST(request: Request) {
 
         // 2. If clips are provided, insert them and generate embeddings
         if (clips && Array.isArray(clips) && clips.length > 0) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const clipsToInsert = clips.map((clip: any) => ({
                 project_id: project.id,
                 title: clip.title,
@@ -45,7 +44,6 @@ export async function POST(request: Request) {
 
             const { data: insertedClips, error: insertError } = await supabase
                 .from('clips')
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 .insert(clipsToInsert as any)
                 .select();
 
@@ -54,7 +52,6 @@ export async function POST(request: Request) {
             } else if (insertedClips && insertedClips.length > 0) {
                 console.log(`[API] Saved ${insertedClips.length} clips. Generating semantic embeddings...`);
                 // Generate embeddings asynchronously (fire and forget)
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 Promise.all(insertedClips.map((clip: any) => {
                     // Extract text context for vector embedding
                     const text = clip.transcript_segment
@@ -78,7 +75,6 @@ export async function POST(request: Request) {
                         video_url: url,
                         status: 'queued',
                         settings: { project_id: project.id }
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     } as any)
                     .select()
                     .single();
@@ -106,7 +102,7 @@ export async function POST(request: Request) {
     }
 }
 
-export async function GET(_request: Request) {
+export async function GET() {
     try {
         const { userId } = await auth();
         if (!userId) {

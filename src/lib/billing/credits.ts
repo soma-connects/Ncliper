@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabaseAdmin as supabase } from '@/lib/supabase/server';
 
 /**
@@ -32,7 +33,7 @@ export async function grantCredits(
     amount: number,
     transactionType: string,
     description: string,
-    metadata: Record<string, any> = {}
+    metadata: Record<string, unknown> = {}
 ): Promise<boolean> {
     try {
         if (amount <= 0) {

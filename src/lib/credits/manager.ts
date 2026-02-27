@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import 'server-only';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { Database } from '@/lib/supabase/types';
@@ -10,7 +11,6 @@ type CreditLedgerInsert = Database['public']['Tables']['credit_ledger']['Insert'
 export async function getCreditBalance(userId: string): Promise<number> {
     try {
         // Use the database function for efficient aggregation
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data, error } = await supabaseAdmin
             .rpc('get_credit_balance', { p_user_id: userId } as any);
 
@@ -52,8 +52,8 @@ export async function deductCredits(
             related_job_id: jobId,
         };
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error } = await (supabaseAdmin.from('credit_ledger') as any)
+        // @ts-expect-error TS might struggle with generic insert due to RLS/type cache
+        const { error } = await supabaseAdmin.from('credit_ledger')
             .insert(ledgerEntry);
 
         if (error) {
@@ -87,8 +87,8 @@ export async function grantCredits(
             description: description || `Credit grant (${amount} credits)`,
         };
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error } = await (supabaseAdmin.from('credit_ledger') as any)
+        // @ts-expect-error TS might struggle with generic insert due to RLS/type cache
+        const { error } = await supabaseAdmin.from('credit_ledger')
             .insert(ledgerEntry);
 
         if (error) {
@@ -121,7 +121,6 @@ export async function getCreditHistory(
     limit: number = 50
 ) {
     try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data, error } = await (supabaseAdmin.from('credit_ledger') as any)
             .select('*')
             .eq('user_id', userId)

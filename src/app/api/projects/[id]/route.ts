@@ -26,7 +26,7 @@ export async function DELETE(
             return NextResponse.json({ error: 'Project not found' }, { status: 404 });
         }
 
-        if ((project as any).user_id !== userId) {
+        if ((project as { user_id: string }).user_id !== userId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 
