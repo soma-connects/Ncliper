@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import ClipCard from '@/components/ClipCard';
 import { Loader2, AlertCircle } from 'lucide-react';
 
@@ -15,7 +15,7 @@ interface SearchResultClip {
     similarity: number;
 }
 
-export default function SearchResultsPage() {
+function SearchResultsContent() {
     const searchParams = useSearchParams();
     const query = searchParams.get('q') || '';
 
@@ -85,15 +85,12 @@ export default function SearchResultsPage() {
             {!isLoading && results.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {results.map((match) => {
-                        // We map the database row back to ClipCard props
-                        // Since we don't have start/end strictly in the match signature, we mock it or default to 0
-                        // (Ideally we would join with clips table to get full metadata, but match_clips RPC does some of this)
                         return (
                             <ClipCard
                                 key={match.id}
-                                startTime={0} // Default since we rely on actual clip for playback
+                                startTime={0}
                                 endTime={0}
-                                score={Math.round(match.similarity * 100)} // Fake virality score using similarity
+                                score={Math.round(match.similarity * 100)}
                                 type={"SearchResult"}
                                 videoUrl={match.video_url}
                                 transcriptSegment={match.transcript_text}
@@ -106,3 +103,16 @@ export default function SearchResultsPage() {
         </div>
     );
 }
+
+export default function SearchResultsPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-10 h-10 animate-spin text-primary" />
+            </div>
+        }>
+            <SearchResultsContent />
+        </Suspense>
+    );
+}
+

@@ -52,8 +52,7 @@ export async function deductCredits(
             related_job_id: jobId,
         };
 
-        // @ts-expect-error TS might struggle with generic insert due to RLS/type cache
-        const { error } = await supabaseAdmin.from('credit_ledger')
+        const { error } = await (supabaseAdmin.from('credit_ledger') as any)
             .insert(ledgerEntry);
 
         if (error) {
@@ -87,8 +86,7 @@ export async function grantCredits(
             description: description || `Credit grant (${amount} credits)`,
         };
 
-        // @ts-expect-error TS might struggle with generic insert due to RLS/type cache
-        const { error } = await supabaseAdmin.from('credit_ledger')
+        const { error } = await (supabaseAdmin.from('credit_ledger') as any)
             .insert(ledgerEntry);
 
         if (error) {
