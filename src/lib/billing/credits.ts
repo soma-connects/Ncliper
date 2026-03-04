@@ -8,16 +8,22 @@ export async function getUserBalance(userId: string): Promise<number> {
     try {
         if (!userId) return 0;
 
-        const { data, error } = await (supabase.rpc as any)('get_user_balance', {
-            user_uid: userId
-        });
+        // Directly SUM the ledger — no RPC function needed
+        const { data: rows, error } = await supabase
+            .from('credit_ledger')
+            .select('amount')
+            .eq('user_id', userId);
 
         if (error) {
             console.error('[Billing] Failed to fetch balance:', error);
             return 0;
         }
 
-        return data || 0;
+        const total = (rows || []).reduce(
+            (sum: number, r: { amount: number }) => sum + (r.amount || 0),
+            0
+        );
+        return total;
     } catch (error) {
         console.error('[Billing] Exception fetching balance:', error);
         return 0;

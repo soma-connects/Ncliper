@@ -10,16 +10,21 @@ type CreditLedgerInsert = Database['public']['Tables']['credit_ledger']['Insert'
  */
 export async function getCreditBalance(userId: string): Promise<number> {
     try {
-        // Use the database function for efficient aggregation
-        const { data, error } = await supabaseAdmin
-            .rpc('get_credit_balance', { p_user_id: userId } as any);
+        // Direct SUM — no SQL function needed in Supabase
+        const { data: rows, error } = await supabaseAdmin
+            .from('credit_ledger')
+            .select('amount')
+            .eq('user_id', userId);
 
         if (error) {
             console.error('[Credits] Failed to get balance:', error);
             return 0;
         }
 
-        return data || 0;
+        return (rows || []).reduce(
+            (sum: number, r: { amount: number }) => sum + (r.amount || 0),
+            0
+        );
     } catch (error) {
         console.error('[Credits] Balance check error:', error);
         return 0;
