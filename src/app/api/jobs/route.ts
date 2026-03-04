@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
                 await deductCredits(
                     userId,
                     estimatedCost,
-                    'video_processing',
+                    'USAGE',
                     `Processed video (Job ${jobRecord.id})`,
                     String(jobRecord.id),
                     true // Force deduction even if it sends them slightly negative

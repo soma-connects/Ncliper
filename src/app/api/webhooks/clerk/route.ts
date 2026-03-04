@@ -60,7 +60,7 @@ export async function POST(req: Request) {
         const success = await grantCredits(
             id,
             60, // 60 Credits = 60 Minutes = 1 hour of free time
-            'signup_bonus',
+            'BONUS',
             'Welcome to Ncliper! Here are 60 free credits to get started.',
             { email: primaryEmail }
         );

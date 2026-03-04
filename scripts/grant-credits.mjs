@@ -27,7 +27,7 @@ async function grantCredits(userId, amount = 60) {
         .insert({
             user_id: userId,
             amount: amount,
-            transaction_type: 'signup_bonus',
+            transaction_type: 'BONUS',
             description: 'Manual signup bonus — welcome to Ncliper!',
             metadata: { source: 'admin_script' }
         });
