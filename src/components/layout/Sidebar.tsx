@@ -1,8 +1,8 @@
 'use client';
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useClerk } from "@clerk/nextjs";
+import { usePathname } from "next/navigation";
+import { SignOutButton } from "@clerk/nextjs";
 import {
     LayoutDashboard,
     FolderOpen,
@@ -31,13 +31,6 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
     const pathname = usePathname();
-    const { signOut } = useClerk();
-    const router = useRouter();
-
-    const handleSignOut = async () => {
-        await signOut();
-        router.push('/');
-    };
 
     return (
         <>
@@ -52,12 +45,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             <aside
                 className={cn(
                     "w-64 h-screen border-r border-border bg-card/50 backdrop-blur-xl flex flex-col fixed left-0 top-0 z-50 transition-transform duration-300",
-                    // Mobile: slide in/out
+                    // Mobile: slide in/out based on isOpen
                     isOpen ? "translate-x-0" : "-translate-x-full",
                     // Desktop: always visible
                     "lg:translate-x-0"
                 )}
             >
+                {/* Logo */}
                 <div className="p-6 flex items-center justify-between border-b border-border/40">
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-[0_0_15px_rgba(139,92,246,0.5)]">
@@ -71,12 +65,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     <button
                         onClick={onClose}
                         className="lg:hidden p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-white transition-colors"
+                        aria-label="Close sidebar"
                     >
                         <X className="w-5 h-5" />
                     </button>
                 </div>
 
-                <nav className="flex-1 px-4 py-6 gap-2 flex flex-col">
+                {/* Nav links */}
+                <nav className="flex-1 px-4 py-6 gap-2 flex flex-col overflow-y-auto">
                     {navItems.map((item) => {
                         const isActive = pathname === item.href ||
                             (item.href !== "/dashboard" && pathname.startsWith(item.href));
@@ -93,10 +89,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                                 )}
                             >
                                 <item.icon className={cn(
-                                    "w-5 h-5 transition-transform duration-300 group-hover:scale-110",
+                                    "w-5 h-5 transition-transform duration-300 group-hover:scale-110 flex-shrink-0",
                                     isActive ? "text-primary" : "text-muted-foreground group-hover:text-white"
                                 )} />
-                                <span className="font-medium">{item.label}</span>
+                                <span className="font-medium truncate">{item.label}</span>
 
                                 {isActive && (
                                     <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -106,8 +102,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     })}
                 </nav>
 
-                <div className="p-4 border-t border-border/40">
-                    <div className="glass-card p-4 rounded-xl mb-4 border border-white/5 bg-gradient-to-b from-white/5 to-transparent flex flex-col items-center">
+                {/* Bottom section: Credits + Sign Out */}
+                <div className="p-4 border-t border-border/40 space-y-2">
+                    <div className="glass-card p-4 rounded-xl border border-white/5 bg-gradient-to-b from-white/5 to-transparent flex flex-col items-center">
                         <div className="mb-3 w-full flex justify-center">
                             <CreditsBadge />
                         </div>
@@ -116,13 +113,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         </button>
                     </div>
 
-                    <button
-                        onClick={handleSignOut}
-                        className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-muted-foreground hover:bg-red-500/10 hover:text-red-400 transition-colors"
-                    >
-                        <LogOut className="w-5 h-5" />
-                        <span className="font-medium">Sign Out</span>
-                    </button>
+                    {/* Sign Out — uses Clerk's built-in SignOutButton for reliable auth cleanup */}
+                    <SignOutButton redirectUrl="/">
+                        <button className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-muted-foreground hover:bg-red-500/10 hover:text-red-400 transition-colors">
+                            <LogOut className="w-5 h-5 flex-shrink-0" />
+                            <span className="font-medium">Sign Out</span>
+                        </button>
+                    </SignOutButton>
                 </div>
             </aside>
         </>
