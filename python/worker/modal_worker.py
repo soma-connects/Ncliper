@@ -33,7 +33,8 @@ image = (
         modal.Secret.from_name("ncliper-redis"),
         modal.Secret.from_name("ncliper-r2"),
         modal.Secret.from_name("ncliper-gemini"),
-        modal.Secret.from_name("ncliper-youtube-cookies")
+        modal.Secret.from_name("ncliper-youtube-cookies"),
+        modal.Secret.from_name("ncliper-proxy"),  # YTDLP_PROXY=http://user:pass@ip:port
     ],
     timeout=1800, # 30 minutes max
     cpu=2.0,
@@ -242,10 +243,11 @@ def process_video(job_id: str, project_id: str, video_url: str, settings: Dict[s
         modal.Secret.from_name("ncliper-redis"),
         modal.Secret.from_name("ncliper-r2"),
         modal.Secret.from_name("ncliper-gemini"),
-        modal.Secret.from_name("ncliper-youtube-cookies")
+        modal.Secret.from_name("ncliper-youtube-cookies"),
+        modal.Secret.from_name("ncliper-proxy"),  # YTDLP_PROXY=http://user:pass@ip:port
     ]
 )
-@modal.web_endpoint(method="POST")
+@modal.fastapi_endpoint(method="POST")
 def process_video_app(item: Dict):
     """
     Web endpoint wrapper for process_video

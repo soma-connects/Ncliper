@@ -67,6 +67,23 @@ def _get_cookie_opts() -> dict:
     return {}
 
 
+def _get_proxy_opts() -> dict:
+    """
+    Get yt-dlp proxy options from the YTDLP_PROXY environment variable.
+
+    Set this in your Modal Secret (ncliper-proxy) as:
+        YTDLP_PROXY=http://user:pass@ip:port
+
+    If the env var is not set, downloads go direct (no proxy).
+    """
+    proxy_url = os.getenv("YTDLP_PROXY", "").strip()
+    if proxy_url:
+        print(f"[VideoDownloader] Using proxy: {proxy_url[:30]}...")
+        return {'proxy': proxy_url}
+    print("[VideoDownloader] No proxy configured — downloading direct.")
+    return {}
+
+
 # ---------------------------------------------------------------------------
 # 1. Metadata — via YouTube oEmbed API (no auth required)
 # ---------------------------------------------------------------------------
@@ -253,12 +270,23 @@ def download_video(url: str, output_dir: str = "/tmp") -> str:
         print(f"[VideoDownloader] Trying strategy: {strategy['name']}")
         
         ydl_opts = {
-            'format': 'best[ext=mp4]/best',
+            'format': 'bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720]/best',
             'outtmpl': f'{output_dir}/%(id)s.%(ext)s',
             'quiet': False,
             'no_warnings': False,
             'prefer_ffmpeg': True,
-            'fragment_retries': 10,
+            # --- Bandwidth Bottleneck Fix ---
+            # Cap download speed to 5 MB/s. This keeps the download rate
+            # well within the typical 10-50 Mbps Static ISP proxy limit,
+            # preventing connection drops and proxy timeouts.
+            'ratelimit': 5_000_000,       # 5 MB/s (in bytes)
+            # --- Resilience & Retry Settings ---
+            'retries': 5,                 # retry up to 5x on transient errors
+            'fragment_retries': 10,       # retry failed HLS/DASH fragments
+            'socket_timeout': 30,         # fail fast on hung proxy connections
+            'retry_sleep_functions': {'http': lambda n: 2 ** n},  # exponential backoff
+            # --- Proxy ---
+            **_get_proxy_opts(),
         }
         
         # Apply strategy options
