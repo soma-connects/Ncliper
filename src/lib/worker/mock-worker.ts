@@ -87,46 +87,43 @@ function delay(ms: number) {
 }
 
 function generateMockClips(jobId: string, originalVideoUrl: string) {
-    // Generate 3 "Hormozi-style" viral clips
+    // Generate 3 "Hormozi-style" viral clips conforming to actual DB schema
     return [
         {
             title: "The Pattern Interrupt",
-            description: "High-retention hook detected at 0:15",
-            video_url: originalVideoUrl, // Use original for now, backend would be R2 URL
-            thumbnail_url: "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=800&q=80",
+            video_url: originalVideoUrl,
             start_time: 15.5,
             end_time: 45.2,
-            duration: 29.7,
             virality_score: 95,
-            status: 'completed',
-            type: 'Pattern Interrupt',
-            segments: JSON.stringify([{ start: 15.5, end: 45.2 }])
+            transcript_segment: {
+                text: "High-retention hook detected at 0:15",
+                type: 'Pattern Interrupt',
+                duration: 29.7
+            }
         },
         {
             title: "The Value Bomb",
-            description: "Core actionable advice extracted",
             video_url: originalVideoUrl,
-            thumbnail_url: "https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?w=800&q=80",
             start_time: 120.0,
             end_time: 155.0,
-            duration: 35.0,
             virality_score: 88,
-            status: 'completed',
-            type: 'Value Bomb',
-            segments: JSON.stringify([{ start: 120.0, end: 155.0 }])
+            transcript_segment: {
+                text: "Core actionable advice extracted",
+                type: 'Value Bomb',
+                duration: 35.0
+            }
         },
         {
             title: "Curiosity Gap",
-            description: "Merged intro and conclusion for maximum retention",
-            video_url: originalVideoUrl, // In real app, this would be the stitched clip URL
-            thumbnail_url: "https://images.unsplash.com/photo-1536240478700-b869070f9279?w=800&q=80",
+            video_url: originalVideoUrl,
             start_time: 0.0,
             end_time: 60.0,
-            duration: 45.0,
             virality_score: 92,
-            status: 'completed',
-            type: 'Curiosity Gap',
-            segments: JSON.stringify([{ start: 0, end: 15 }, { start: 280, end: 310 }])
+            transcript_segment: {
+                text: "Merged intro and conclusion for maximum retention",
+                type: 'Curiosity Gap',
+                duration: 45.0
+            }
         }
     ];
 }
