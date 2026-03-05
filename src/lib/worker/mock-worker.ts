@@ -40,9 +40,9 @@ export async function processJobMock(
             .from('clips')
             .insert(clips.map(clip => ({
                 ...clip,
-                user_id: userId, // Ensure ownership
-                job_id: jobId,
-                project_id: null // optional for now
+                // The clips table requires a project_id. If we don't have one, 
+                // we'll need to use a dummy or let the DB fail if it's strictly required
+                project_id: '00000000-0000-0000-0000-000000000000' // Stub project UUID to satisfy constraint
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
             })) as any)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
