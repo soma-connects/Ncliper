@@ -23,8 +23,25 @@ export async function processJobMock(
         await updateJobStatus(supabase, jobId, 'processing', 'Downloading video...');
         await delay(MOCK_DELAY_MS);
 
-        // Step 2: Analyzing (The "Virality Strategist" phase)
+        // Step 2: Analyzing \& Create Project
         await updateJobStatus(supabase, jobId, 'processing', 'Analyzing virality patterns...');
+
+        // Create a real project to satisfy the foreign key constraint
+        const { data: projectData, error: projectError } = await supabase
+            .from('projects')
+            .insert({
+                user_id: userId,
+                title: `Mock Project - Job ${jobId.slice(0, 6)}`,
+                video_url: videoUrl,
+                status: 'completed'
+            } as any)
+            .select('id')
+            .single();
+
+        if (projectError || !projectData) {
+            throw new Error(`Failed to create project: ${projectError?.message}`);
+        }
+
         await delay(MOCK_DELAY_MS);
 
         // Step 3: Generating Clips
@@ -40,9 +57,7 @@ export async function processJobMock(
             .from('clips')
             .insert(clips.map(clip => ({
                 ...clip,
-                // The clips table requires a project_id. If we don't have one, 
-                // we'll need to use a dummy or let the DB fail if it's strictly required
-                project_id: '00000000-0000-0000-0000-000000000000' // Stub project UUID to satisfy constraint
+                project_id: projectData.id // Use the real project ID we just created
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
             })) as any)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any

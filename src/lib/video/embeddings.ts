@@ -5,9 +5,11 @@ import { SupabaseClient } from '@supabase/supabase-js';
 
 const supabase = supabaseAdmin as SupabaseClient<Database>;
 
-const API_KEY = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || '';
-const genAI = new GoogleGenerativeAI(API_KEY);
-const EMBEDDING_MODEL = 'text-embedding-004';
+// Initialize Gemini API
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+
+// Use the recommended model for text embeddings
+const EMBEDDING_MODEL = "models/text-embedding-004";
 
 /**
  * Generate a 768-dimensional vector embedding for a given text string.
