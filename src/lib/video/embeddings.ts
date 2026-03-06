@@ -6,7 +6,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 const supabase = supabaseAdmin as SupabaseClient<Database>;
 
 // Initialize Gemini API
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
 
 // Use the recommended model for text embeddings
 const EMBEDDING_MODEL = "models/text-embedding-004";

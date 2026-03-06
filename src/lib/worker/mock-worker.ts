@@ -1,6 +1,17 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/supabase/types';
 import { saveClipEmbedding } from '@/lib/video/embeddings';
+import { z } from 'zod';
+
+const ClipInsertSchema = z.object({
+    project_id: z.string().uuid(),
+    title: z.string(),
+    start_time: z.number(),
+    end_time: z.number(),
+    video_url: z.string().nullable().optional(),
+    virality_score: z.number().nullable().optional(),
+    transcript_segment: z.any().nullable().optional()
+});
 
 /**
  * Mock Worker Service
@@ -27,16 +38,20 @@ export async function processJobMock(
         await updateJobStatus(supabase, jobId, 'processing', 'Analyzing virality patterns...');
 
         // Create a real project to satisfy the foreign key constraint
-        const { data: projectData, error: projectError } = await supabase
+        const { data, error: projectError } = await supabase
             .from('projects')
             .insert({
                 user_id: userId,
                 title: `Mock Project - Job ${jobId.slice(0, 6)}`,
                 video_url: videoUrl,
                 status: 'completed'
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
             } as any)
             .select('id')
             .single();
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const projectData = data as any;
 
         if (projectError || !projectData) {
             throw new Error(`Failed to create project: ${projectError?.message}`);
@@ -52,26 +67,41 @@ export async function processJobMock(
         const clips = generateMockClips(jobId, videoUrl);
 
         // Insert Clips into DB
-        // We need to fetch back the inserted clips to get their generated UUIDs
+        // Zod stripping prevents ANY extra fields from causing Postgres constraint errors
+        const validatedClips = clips.map(clip => {
+            const parsed = ClipInsertSchema.safeParse({
+                ...clip,
+                project_id: projectData.id
+            });
+            if (!parsed.success) {
+                console.error('[MockWorker] Invalid clip data:', parsed.error);
+                throw new Error(`Invalid mock clip data generated: ${parsed.error.message}`);
+            }
+            return parsed.data;
+        });
+
         const response = await supabase
             .from('clips')
-            .insert(clips.map(clip => ({
-                ...clip,
-                project_id: projectData.id // Use the real project ID we just created
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            })) as any)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .insert(validatedClips as any)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .select() as { data: any[] | null, error: any };
 
-        const insertedClips = response.data;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const insertedClips = response.data as any[] | null;
         const clipError = response.error;
 
         if (clipError || !insertedClips) throw new Error(`Failed to insert clips: ${clipError?.message}`);
 
         console.log(`[MockWorker] Generating Semantic Search Embeddings for ${insertedClips.length} clips...`);
-        for (const insertedClip of insertedClips) {
-            const transcriptText = insertedClip.transcript_segment ? JSON.stringify(insertedClip.transcript_segment) : (insertedClip.description || insertedClip.title || "");
-            await saveClipEmbedding(insertedClip.id, transcriptText);
+        try {
+            for (const insertedClip of insertedClips) {
+                const transcriptText = insertedClip.transcript_segment ? JSON.stringify(insertedClip.transcript_segment) : (insertedClip.title || "");
+                await saveClipEmbedding(insertedClip.id, transcriptText);
+            }
+        } catch (embedError) {
+            console.warn(`[MockWorker] Non-fatal error during embedding generation:`, embedError);
+            // We intentionally do not throw here, as the clips were already successfully saved.
         }
 
         // Step 4: Complete

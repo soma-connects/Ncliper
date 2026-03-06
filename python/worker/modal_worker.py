@@ -201,8 +201,7 @@ def process_video(job_id: str, project_id: str, video_url: str, settings: Dict[s
                 "start_time": hook.start_time,
                 "end_time": hook.end_time,
                 "virality_score": hook.virality_score,
-                "title": f"{hook.type} ({int(hook.virality_score)}/100)",
-                "status": "completed"
+                "title": f"{hook.type} ({int(hook.virality_score)}/100)"
             }
             
             uploaded_clips.append(clip_record)
