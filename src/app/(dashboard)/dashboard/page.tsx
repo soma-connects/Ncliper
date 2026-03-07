@@ -80,9 +80,17 @@ export default function DashboardHome() {
         }
     };
 
-    const handleVideoFound = (url: string, title: string, clips: Clip[]) => {
+    const handleVideoFound = (url: string, title: string, clips: Clip[], projectId?: string) => {
         setGeneratedClips(clips);
-        createProjectMutation.mutate({ url, title, clips });
+        if (projectId) {
+            // The pipeline already created the project server-side for Modal constraints. 
+            // Just jump directly to it!
+            setActiveProjectId(projectId);
+            queryClient.invalidateQueries({ queryKey: ['projects', userId] });
+        } else {
+            // Legacy fallback if running old mock worker
+            createProjectMutation.mutate({ url, title, clips });
+        }
     };
 
     return (

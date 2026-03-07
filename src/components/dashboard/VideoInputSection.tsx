@@ -7,7 +7,7 @@ import { useJobPolling } from '@/hooks/useJobPolling';
 import { Clip } from '@/lib/video/types';
 
 interface VideoInputSectionProps {
-    onVideoFound: (url: string, title: string, clips: Clip[]) => void;
+    onVideoFound: (url: string, title: string, clips: Clip[], projectId?: string) => void;
     isLoading?: boolean;
 }
 
@@ -45,7 +45,8 @@ export function VideoInputSection({ onVideoFound, isLoading = false }: VideoInpu
                 setStatusMessage("Processing complete!");
                 setLocalLoading(false);
                 const { clips, metadata } = jobData.result_data;
-                onVideoFound(url, metadata.title, clips);
+                const projectId = jobData.settings?.project_id;
+                onVideoFound(url, metadata.title, clips, projectId);
                 setCurrentJobId(null);
             } else {
                 // Job completed but no result_data yet — API might still be assembling it

@@ -22,6 +22,11 @@ export interface JobData {
             hooks_found: number;
         };
     };
+    settings?: {
+        project_id?: string;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        [key: string]: any;
+    };
     error?: string;
     message?: string;
 }
