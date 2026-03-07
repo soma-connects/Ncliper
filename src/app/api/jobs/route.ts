@@ -88,7 +88,8 @@ export async function POST(req: NextRequest) {
             .insert({
                 user_id: userId,
                 title: `AI Video Project - ${new Date().toLocaleTimeString()}`,
-            } as never)
+                video_url,
+            })
             .select('id')
             .single();
 
