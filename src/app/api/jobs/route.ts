@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
                 user_id: userId,
                 title: `AI Video Project - ${new Date().toLocaleTimeString()}`,
                 video_url,
-            })
+            } as never)
             .select('id')
             .single();
 
