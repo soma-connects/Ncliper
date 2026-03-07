@@ -31,11 +31,11 @@ export async function processJobMock(
 
     try {
         // Step 1: Downloading
-        await updateJobStatus(supabase, jobId, 'processing', 'Downloading video...');
+        await updateJobStatus(supabase, jobId, 'processing');
         await delay(MOCK_DELAY_MS);
 
         // Step 2: Analyzing \& Create Project
-        await updateJobStatus(supabase, jobId, 'processing', 'Analyzing virality patterns...');
+        await updateJobStatus(supabase, jobId, 'processing');
 
         // Create a real project to satisfy the foreign key constraint
         const { data, error: projectError } = await supabase
@@ -60,7 +60,7 @@ export async function processJobMock(
         await delay(MOCK_DELAY_MS);
 
         // Step 3: Generating Clips
-        await updateJobStatus(supabase, jobId, 'processing', 'Rendering viral clips...');
+        await updateJobStatus(supabase, jobId, 'processing');
         await delay(MOCK_DELAY_MS);
 
         // Create Mock Clips
@@ -105,21 +105,20 @@ export async function processJobMock(
         }
 
         // Step 4: Complete
-        await updateJobStatus(supabase, jobId, 'completed', 'Job finished successfully.');
+        await updateJobStatus(supabase, jobId, 'completed');
         console.log(`[MockWorker] Job ${jobId} completed!`);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         console.error(`[MockWorker] Job ${jobId} failed:`, error);
-        await updateJobStatus(supabase, jobId, 'failed', error.message);
+        await updateJobStatus(supabase, jobId, 'failed');
     }
 }
 
 async function updateJobStatus(
     supabase: SupabaseClient<Database>,
     jobId: string,
-    status: 'queued' | 'processing' | 'completed' | 'failed',
-    _message?: string
+    status: 'queued' | 'processing' | 'completed' | 'failed'
 ) {
     // NOTE: The 'jobs' table does NOT have a 'message' column.
     // Only update 'status' to avoid silent Supabase errors.

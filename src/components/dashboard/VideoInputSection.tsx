@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Youtube, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useJobPolling } from '@/hooks/useJobPolling';
@@ -19,7 +19,6 @@ export function VideoInputSection({ onVideoFound, isLoading = false }: VideoInpu
     const [error, setError] = useState<string | null>(null);
     const [statusMessage, setStatusMessage] = useState<string>("");
     const [currentJobId, setCurrentJobId] = useState<string | null>(null);
-    const jobStartedAt = useRef<number | null>(null);
 
     // Use job polling hook
     const { status: jobStatus, data: jobData, error: jobError } = useJobPolling(currentJobId);

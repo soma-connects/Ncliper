@@ -56,26 +56,23 @@ export async function GET(
         if (job.status === 'completed' && !resultData) {
             // The mock worker (and production worker) store clips in the `clips` table
             // linked via a `project`. We need to find the project created for this job.
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { data: projects } = await (supabase
                 .from('projects')
                 .select('id, title')
                 .eq('user_id', userId)
                 .order('created_at', { ascending: false })
-                .limit(1) as any);
+                .limit(1) as unknown as { data: unknown[], error: unknown });
 
             if (projects && projects.length > 0) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const project = projects[0] as any;
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const project = projects[0] as Record<string, unknown>;
                 const { data: clips } = await (supabase
                     .from('clips')
                     .select('*')
-                    .eq('project_id', project.id) as any);
+                    .eq('project_id', project.id as string) as unknown as { data: unknown[], error: unknown });
 
                 if (clips && clips.length > 0) {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     resultData = {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         clips: clips.map((c: any) => ({
                             id: c.id,
                             title: c.title,
@@ -86,7 +83,7 @@ export async function GET(
                             transcript_segment: c.transcript_segment,
                         })),
                         metadata: {
-                            title: project.title,
+                            title: project.title as string,
                             duration: 0,
                             hooks_found: clips.length,
                         },
