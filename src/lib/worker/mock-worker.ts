@@ -119,12 +119,20 @@ async function updateJobStatus(
     supabase: SupabaseClient<Database>,
     jobId: string,
     status: 'queued' | 'processing' | 'completed' | 'failed',
-    message?: string
+    _message?: string
 ) {
+    // NOTE: The 'jobs' table does NOT have a 'message' column.
+    // Only update 'status' to avoid silent Supabase errors.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase.from('jobs') as any)
-        .update({ status, message })
+    const { error } = await (supabase.from('jobs') as any)
+        .update({ status })
         .eq('id', jobId);
+
+    if (error) {
+        console.error(`[MockWorker] Failed to update job ${jobId} to ${status}:`, error.message);
+    } else {
+        console.log(`[MockWorker] Updated job ${jobId} → ${status}`);
+    }
 }
 
 function delay(ms: number) {

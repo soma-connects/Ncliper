@@ -176,11 +176,11 @@ def analyze_transcript(transcript: str) -> List[ViralHook]:
     
     try:
         # Model strategy:
-        # 1. Try gemini-1.5-flash (fast, cheap, good for long context)
-        # 2. Fallback to gemini-1.5-pro-latest (if higher reasoning needed)
+        # 1. Try gemini-2.0-flash (fast, cheap, good for long context)
+        # 2. Fallback to gemini-2.5-flash (if higher reasoning needed)
         
-        primary_model_name = "gemini-1.5-flash"
-        fallback_model_name = "gemini-1.5-pro-latest"
+        primary_model_name = "gemini-2.0-flash"
+        fallback_model_name = "gemini-2.5-flash"
         
         # Enhanced Virality Prompt
         import random
@@ -353,8 +353,8 @@ Find moments where the VISUAL action matches the AUDIO hook.
 Return strict JSON array of hooks (same schema as before).
 Ensure timestamps are accurate to what you SEE and HEAR.
 """
-        # 3. Call Gemini 1.5 Flash
-        model_name = "gemini-1.5-flash"
+        # 3. Call Gemini 2.0 Flash
+        model_name = "gemini-2.0-flash"
         print(f"[AI] Analyzing video with {model_name}...")
         
         model = genai.GenerativeModel(

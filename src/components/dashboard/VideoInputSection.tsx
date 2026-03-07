@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Youtube, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useJobPolling } from '@/hooks/useJobPolling';
@@ -11,28 +11,47 @@ interface VideoInputSectionProps {
     isLoading?: boolean;
 }
 
+const JOB_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
+
 export function VideoInputSection({ onVideoFound, isLoading = false }: VideoInputSectionProps) {
     const [url, setUrl] = useState('');
     const [localLoading, setLocalLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [statusMessage, setStatusMessage] = useState<string>("");
     const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+    const jobStartedAt = useRef<number | null>(null);
 
     // Use job polling hook
     const { status: jobStatus, data: jobData, error: jobError } = useJobPolling(currentJobId);
 
+    // Timeout: if job stays stuck for > 2 minutes, auto-reset
+    useEffect(() => {
+        if (!currentJobId) return;
+
+        const timer = setTimeout(() => {
+            if (currentJobId && (jobStatus === 'queued' || jobStatus === 'processing')) {
+                setError('Job timed out after 2 minutes. The worker may be offline. Please try again.');
+                setLocalLoading(false);
+                setCurrentJobId(null);
+            }
+        }, JOB_TIMEOUT_MS);
+
+        return () => clearTimeout(timer);
+    }, [currentJobId, jobStatus]);
+
     // Handle job completion
     useEffect(() => {
-        if (jobStatus === 'completed' && jobData?.result_data) {
-            setStatusMessage("Processing complete!");
-            setLocalLoading(false);
-
-            // Extract clips from result
-            const { clips, metadata } = jobData.result_data;
-            onVideoFound(url, metadata.title, clips);
-
-            // Reset job tracking
-            setCurrentJobId(null);
+        if (jobStatus === 'completed') {
+            if (jobData?.result_data) {
+                setStatusMessage("Processing complete!");
+                setLocalLoading(false);
+                const { clips, metadata } = jobData.result_data;
+                onVideoFound(url, metadata.title, clips);
+                setCurrentJobId(null);
+            } else {
+                // Job completed but no result_data yet — API might still be assembling it
+                setStatusMessage("Finalizing clips...");
+            }
         } else if (jobStatus === 'failed') {
             setError(jobError || 'Job failed');
             setLocalLoading(false);

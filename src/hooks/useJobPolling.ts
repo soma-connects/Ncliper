@@ -112,10 +112,38 @@ export function useJobPolling(jobId: string | null) {
                 }
             });
 
+        // 3. Fallback HTTP polling every 3 seconds
+        //    Supabase Realtime only works if enabled on the table.
+        //    This guarantees the UI will transition even if Realtime is off.
+        const pollInterval = setInterval(async () => {
+            if (!isMounted) return;
+            try {
+                const res = await fetch(`/api/jobs/${jobId}`);
+                if (!res.ok) return;
+                const result: JobData = await res.json();
+
+                if (!isMounted) return;
+                setStatus(result.status);
+                setData(result);
+
+                if (result.status === 'failed') {
+                    setError(result.error || 'Job failed');
+                    setIsPolling(false);
+                    clearInterval(pollInterval);
+                } else if (result.status === 'completed') {
+                    setIsPolling(false);
+                    clearInterval(pollInterval);
+                }
+            } catch {
+                // Ignore transient fetch errors during polling
+            }
+        }, 3000);
+
         // Cleanup
         return () => {
             isMounted = false;
             supabase.removeChannel(channel);
+            clearInterval(pollInterval);
         };
     }, [jobId]);
 

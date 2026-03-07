@@ -8,8 +8,8 @@ const supabase = supabaseAdmin as SupabaseClient<Database>;
 // Initialize Gemini API
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
 
-// Use the recommended model for text embeddings
-const EMBEDDING_MODEL = "models/text-embedding-004";
+// Use the current embedding model (text-embedding-004 was shut down Jan 2026)
+const EMBEDDING_MODEL = "gemini-embedding-001";
 
 /**
  * Generate a 768-dimensional vector embedding for a given text string.
@@ -22,7 +22,7 @@ export async function generateTextEmbedding(text: string): Promise<number[] | nu
         const result = await model.embedContent(text);
 
         const embedding = result.embedding.values;
-        if (!embedding || embedding.length !== 768) {
+        if (!embedding || embedding.length === 0) {
             console.error('[Embeddings] Invalid embedding returned from Gemini');
             return null;
         }

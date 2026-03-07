@@ -108,37 +108,16 @@ export async function POST(req: NextRequest) {
         }
 
         // 5. Hybrid Worker Pipeline (Async)
-        // We run the download/upload locally to use residential IP, then invoke Modal
         (async () => {
             try {
                 console.log(`[API] Starting Pipeline for job ${jobRecord.id}`);
 
-                const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
-                let r2Url = undefined;
-                let filePath = undefined;
+                const useMockWorker = process.env.NODE_ENV === 'development' && !process.env.FORCE_MODAL;
 
-                if (!isProduction) {
-                    // Import dynamically to avoid top-level await issues if any
-                    const { downloadVideoLocally, uploadToR2 } = await import('@/lib/video-downloader');
-
-                    // 5a. Local Download (Bypasses YouTube blocking)
-                    console.log('[API] Step 1: Downloading locally (Residential IP Bypass)...');
-                    filePath = await downloadVideoLocally(video_url, String(jobRecord.id));
-
-                    // 5b. Upload to R2
-                    console.log('[API] Step 2: Uploading to R2...');
-                    const r2Key = `raw/${jobRecord.id}.mp4`;
-                    r2Url = await uploadToR2(filePath, r2Key);
-                    console.log(`[API] R2 URL: ${r2Url}`);
-                } else {
-                    console.log('[API] Production environment detected: Skipping local download. Modal will download directly.');
-                }
-
-                // 5c. Invoke Modal or Mock Worker
-                if (process.env.NODE_ENV === 'development' && !process.env.FORCE_MODAL) {
-                    console.log('[API] Dev mode detected: Using Mock Worker');
+                if (useMockWorker) {
+                    // DEV MODE: Skip expensive download/upload, go straight to mock worker
+                    console.log('[API] Dev mode detected: Using Mock Worker (skipping download)');
                     const { processJobMock } = await import('@/lib/worker/mock-worker');
-                    // Run mock processing (async, don't await)
                     processJobMock(
                         String(jobRecord.id),
                         video_url,
@@ -146,27 +125,44 @@ export async function POST(req: NextRequest) {
                         supabase
                     );
                 } else {
+                    // PRODUCTION / FORCE_MODAL: Full pipeline
+                    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+                    let r2Url = undefined;
+                    let filePath = undefined;
+
+                    if (!isProduction) {
+                        const { downloadVideoLocally, uploadToR2 } = await import('@/lib/video-downloader');
+
+                        console.log('[API] Step 1: Downloading locally (Residential IP Bypass)...');
+                        filePath = await downloadVideoLocally(video_url, String(jobRecord.id));
+
+                        console.log('[API] Step 2: Uploading to R2...');
+                        const r2Key = `raw/${jobRecord.id}.mp4`;
+                        r2Url = await uploadToR2(filePath, r2Key);
+                        console.log(`[API] R2 URL: ${r2Url}`);
+                    } else {
+                        console.log('[API] Production: Modal will download directly.');
+                    }
+
                     console.log('[API] Step 3: Invoking Modal Worker...');
                     const modalParams = {
                         job_id: String(jobRecord.id),
                         project_id: jobRecord.settings?.project_id || '',
-                        video_url, // Keep original URL for metadata
+                        video_url,
                         settings: {
                             width: settings?.aspect_ratio === '1:1' ? 1080 : 1080,
                             height: settings?.aspect_ratio === '16:9' ? 1080 : 1920,
                             clip_count: settings?.clip_count || 3,
-                            ...(r2Url ? { download_url: r2Url } : {}) // Only pass if we uploaded to R2
+                            ...(r2Url ? { download_url: r2Url } : {})
                         },
                     };
                     await invokeModalWorker(modalParams);
                     console.log('[API] Modal invocation successful');
-                }
 
-                // Clean up temp file
-                if (filePath) {
-                    const fs = await import('fs');
-                    if (fs.existsSync(filePath)) {
-                        fs.unlinkSync(filePath);
+                    // Clean up temp file
+                    if (filePath) {
+                        const fs = await import('fs');
+                        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
                     }
                 }
 
