@@ -82,18 +82,38 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // 4. Create job record in database
+        // 4. Create Project first, to provide a strict UUID to Modal for the clips constraint
+        const { data: projectRecordRaw, error: projectError } = await supabase
+            .from('projects')
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .insert({
+                user_id: userId,
+                title: `AI Video Project - ${new Date().toLocaleTimeString()}`,
+            } as any)
+            .select('id')
+            .single();
+
+        const projectRecord = projectRecordRaw as { id: string } | null;
+
+        if (projectError || !projectRecord) {
+            console.error('[API] Failed to create project record:', projectError);
+            return NextResponse.json({ error: 'Failed to initialize project' }, { status: 500 });
+        }
+
+        // 5. Create job record in database, embedding the project_id
+        const finalSettings = { ...(settings || {}), project_id: projectRecord.id };
+
         const jobInsert: Database['public']['Tables']['jobs']['Insert'] = {
             user_id: userId,
             video_url,
             status: 'queued',
-            settings: settings || null,
+            settings: finalSettings,
         };
 
         const { data: jobRecordRaw, error: dbError } = await supabase
             .from('jobs')
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .insert(jobInsert as any) // Type assertion: table exists but TS cache needs refresh
+            .insert(jobInsert as any)
             .select()
             .single();
 
@@ -122,6 +142,7 @@ export async function POST(req: NextRequest) {
                         String(jobRecord.id),
                         video_url,
                         userId,
+                        String(jobRecord.settings?.project_id),
                         supabase
                     );
                 } else {

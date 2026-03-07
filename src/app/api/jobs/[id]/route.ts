@@ -54,40 +54,43 @@ export async function GET(
         let resultData = job.result_data || null;
 
         if (job.status === 'completed' && !resultData) {
-            // The mock worker (and production worker) store clips in the `clips` table
-            // linked via a `project`. We need to find the project created for this job.
-            const { data: projects } = await (supabase
-                .from('projects')
-                .select('id, title')
-                .eq('user_id', userId)
-                .order('created_at', { ascending: false })
-                .limit(1) as unknown as { data: unknown[], error: unknown });
+            // Retrieve project_id stored exactly for this job
+            const projectId = (job.settings as Record<string, unknown>)?.project_id as string | undefined;
 
-            if (projects && projects.length > 0) {
-                const project = projects[0] as Record<string, unknown>;
-                const { data: clips } = await (supabase
-                    .from('clips')
-                    .select('*')
-                    .eq('project_id', project.id as string) as unknown as { data: unknown[], error: unknown });
+            if (projectId) {
+                const { data: projectRaw } = await (supabase
+                    .from('projects')
+                    .select('id, title')
+                    .eq('id', projectId)
+                    .single() as unknown as { data: unknown, error: unknown });
 
-                if (clips && clips.length > 0) {
-                    resultData = {
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        clips: clips.map((c: any) => ({
-                            id: c.id,
-                            title: c.title,
-                            url: c.video_url || '',
-                            virality_score: c.virality_score || 0,
-                            start_time: c.start_time,
-                            end_time: c.end_time,
-                            transcript_segment: c.transcript_segment,
-                        })),
-                        metadata: {
-                            title: project.title as string,
-                            duration: 0,
-                            hooks_found: clips.length,
-                        },
-                    };
+                const project = projectRaw as Record<string, unknown> | null;
+
+                if (project) {
+                    const { data: clips } = await (supabase
+                        .from('clips')
+                        .select('*')
+                        .eq('project_id', project.id as string) as unknown as { data: unknown[], error: unknown });
+
+                    if (clips && clips.length > 0) {
+                        resultData = {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            clips: clips.map((c: any) => ({
+                                id: c.id,
+                                title: c.title,
+                                url: c.video_url || '',
+                                virality_score: c.virality_score || 0,
+                                start_time: c.start_time,
+                                end_time: c.end_time,
+                                transcript_segment: c.transcript_segment,
+                            })),
+                            metadata: {
+                                title: project.title as string,
+                                duration: 0,
+                                hooks_found: clips.length,
+                            },
+                        };
+                    }
                 }
             }
         }

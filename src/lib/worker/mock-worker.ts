@@ -25,6 +25,7 @@ export async function processJobMock(
     jobId: string,
     videoUrl: string,
     userId: string,
+    projectId: string,
     supabase: SupabaseClient<Database>
 ) {
     console.log(`[MockWorker] Starting job ${jobId} for user ${userId}`);
@@ -34,28 +35,11 @@ export async function processJobMock(
         await updateJobStatus(supabase, jobId, 'processing');
         await delay(MOCK_DELAY_MS);
 
-        // Step 2: Analyzing \& Create Project
+        // Step 2: Analyzing
         await updateJobStatus(supabase, jobId, 'processing');
 
-        // Create a real project to satisfy the foreign key constraint
-        const { data, error: projectError } = await supabase
-            .from('projects')
-            .insert({
-                user_id: userId,
-                title: `Mock Project - Job ${jobId.slice(0, 6)}`,
-                video_url: videoUrl,
-                status: 'completed'
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            } as any)
-            .select('id')
-            .single();
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const projectData = data as any;
-
-        if (projectError || !projectData) {
-            throw new Error(`Failed to create project: ${projectError?.message}`);
-        }
+        // Project was already created by the API route
+        const projectData = { id: projectId };
 
         await delay(MOCK_DELAY_MS);
 
