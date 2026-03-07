@@ -85,11 +85,10 @@ export async function POST(req: NextRequest) {
         // 4. Create Project first, to provide a strict UUID to Modal for the clips constraint
         const { data: projectRecordRaw, error: projectError } = await supabase
             .from('projects')
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .insert({
                 user_id: userId,
                 title: `AI Video Project - ${new Date().toLocaleTimeString()}`,
-            } as any)
+            } as never)
             .select('id')
             .single();
 
