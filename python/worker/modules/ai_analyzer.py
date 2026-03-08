@@ -320,10 +320,9 @@ def upload_video_for_analysis(video_path: str):
     print(f"\n[AI] Video is active and ready for analysis.")
     return video_file
 
-
 def analyze_video(video_path: str, transcript: str = "") -> List[ViralHook]:
     """
-    Analyze video VISUALLY with Gemini 1.5 Flash (Multimodal)
+    Analyze video VISUALLY with Gemini Multimodal Flash
     Falls back to transcript-only if upload fails
     """
     if not API_KEY:
@@ -333,7 +332,9 @@ def analyze_video(video_path: str, transcript: str = "") -> List[ViralHook]:
         # 1. Upload Video
         video_file = upload_video_for_analysis(video_path)
         if not video_file:
-            return analyze_transcript(transcript)
+            if transcript and transcript != "No transcript available.":
+                return analyze_transcript(transcript)
+            return [] # Full failure: No video upload, no transcript
 
         # 2. Prepare Multimodal Prompt
         prompt = """
@@ -353,8 +354,8 @@ Find moments where the VISUAL action matches the AUDIO hook.
 Return strict JSON array of hooks (same schema as before).
 Ensure timestamps are accurate to what you SEE and HEAR.
 """
-        # 3. Call Gemini 2.0 Flash
-        model_name = "gemini-2.0-flash"
+        # 3. Call Gemini Flash Latest
+        model_name = "gemini-flash-latest"
         print(f"[AI] Analyzing video with {model_name}...")
         
         model = genai.GenerativeModel(

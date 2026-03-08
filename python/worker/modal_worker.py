@@ -141,9 +141,9 @@ def process_video(job_id: str, project_id: str, video_url: str, settings: Dict[s
         else:
             print(f"[Modal Worker] Step 1: Downloading video from YouTube...")
             video_data = video_downloader.download_and_extract_all(video_url, output_dir=temp_dir)
-        print(f"[Modal Worker] Video downloaded: {video_data.file_path}")
-        print(f"[Modal Worker] Transcript length: {len(video_data.transcript)} chars")
-        
+        if video_data.transcript == "No transcript available.":
+            print(f"[Modal Worker] No YouTube transcript found. Proceeding with raw Video-Only Multimodal Analysis...")
+
         # 2. Analyze Video (Multimodal)
         print(f"[Modal Worker] Step 2: Analyzing video (Multimodal)...")
         hooks = ai_analyzer.analyze_video(video_data.file_path, video_data.transcript)

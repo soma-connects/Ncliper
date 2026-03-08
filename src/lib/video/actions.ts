@@ -491,7 +491,10 @@ export async function getProjectClips(projectId: string) {
         return data.map((c: any) => {
             // Use generated clip URL if exists, else fallback to main video URL
             const finalUrl = c.video_url || projectVideoUrl;
-            const videoId = extractVideoId(finalUrl);
+
+            // Generate thumbnail from the original YouTube source video, NOT the generated R2 clip
+            const sourceVideoId = extractVideoId(projectVideoUrl);
+            const fallbackThumbnail = "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800&q=80";
 
             return {
                 id: c.id,
@@ -499,8 +502,8 @@ export async function getProjectClips(projectId: string) {
                 score: c.virality_score || 0,
                 duration: formatDuration((c.end_time || 0) - (c.start_time || 0)),
                 url: finalUrl,
-                videoId: videoId,
-                thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+                videoId: sourceVideoId,
+                thumbnailUrl: sourceVideoId ? `https://img.youtube.com/vi/${sourceVideoId}/maxresdefault.jpg` : fallbackThumbnail,
                 startTime: c.start_time,
                 endTime: c.end_time,
                 segments: c.transcript_segment ? (Array.isArray(c.transcript_segment) ? c.transcript_segment : []) : [],
