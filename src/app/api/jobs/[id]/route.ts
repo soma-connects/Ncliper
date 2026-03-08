@@ -73,16 +73,29 @@ export async function GET(
                         .eq('project_id', project.id as string) as unknown as { data: unknown[], error: unknown });
 
                     if (clips && clips.length > 0) {
+                        // Helper to extract video ID for thumbnail
+                        const extractVideoId = (url: string) => {
+                            if (url.includes('v=')) return url.split('v=')[1]?.split('&')[0];
+                            if (url.includes('youtu.be/')) return url.split('youtu.be/')[1]?.split('?')[0];
+                            return '';
+                        };
+                        const sourceVideoId = extractVideoId(project.video_url as string || '');
+                        const fallbackThumbnail = "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800&q=80";
+
                         resultData = {
                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             clips: clips.map((c: any) => ({
                                 id: c.id,
                                 title: c.title,
+                                score: c.virality_score || 0,
+                                duration: `${Math.floor((c.end_time || 0) - (c.start_time || 0))}s`,
                                 url: c.video_url || '',
-                                virality_score: c.virality_score || 0,
-                                start_time: c.start_time,
-                                end_time: c.end_time,
-                                transcript_segment: c.transcript_segment,
+                                videoId: sourceVideoId,
+                                thumbnailUrl: sourceVideoId ? `https://img.youtube.com/vi/${sourceVideoId}/maxresdefault.jpg` : fallbackThumbnail,
+                                startTime: c.start_time,
+                                endTime: c.end_time,
+                                segments: c.transcript_segment ? (Array.isArray(c.transcript_segment) ? c.transcript_segment : [{ start: c.start_time, end: c.end_time }]) : [],
+                                transcript: []
                             })),
                             metadata: {
                                 title: project.title as string,
