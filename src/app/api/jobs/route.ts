@@ -82,12 +82,26 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        // Fetch the real YouTube video title quickly via OEmbed
+        let videoTitle = `AI Video Project - ${new Date().toLocaleTimeString()}`;
+        try {
+            const oembedRes = await fetch(`https://www.youtube.com/oembed?url=${video_url}&format=json`);
+            if (oembedRes.ok) {
+                const oembedData = await oembedRes.json();
+                if (oembedData.title) {
+                    videoTitle = oembedData.title;
+                }
+            }
+        } catch (e) {
+            console.log('[API] Failed to fetch OEmbed title, falling back to default', e);
+        }
+
         // 4. Create Project first, to provide a strict UUID to Modal for the clips constraint
         const { data: projectRecordRaw, error: projectError } = await supabase
             .from('projects')
             .insert({
                 user_id: userId,
-                title: `AI Video Project - ${new Date().toLocaleTimeString()}`,
+                title: videoTitle,
                 video_url,
             } as never)
             .select('id')
