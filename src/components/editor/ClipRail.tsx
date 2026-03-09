@@ -120,7 +120,7 @@ export function ClipRail({ onSelect, activeClipId, clips = [], projectId }: Clip
             // Wait, generateMoreClipsAction needs to be imported.
             // I'll assume it's available via module import 'actions' below.
             const { generateMoreClipsAction } = await import('@/lib/video/actions');
-            await generateMoreClipsAction(clips[0].url, projectId);
+            await generateMoreClipsAction(projectId);
 
             // Reload page to see new clips? Or invalidate query.
             // For MVP, simple reload is safest to fetch new state.

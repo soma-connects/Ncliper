@@ -52,8 +52,12 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
             thumbnailUrl: sourceVideoId ? `https://img.youtube.com/vi/${sourceVideoId}/maxresdefault.jpg` : fallbackThumbnail,
             startTime: clip.start_time,
             endTime: clip.end_time,
-            segments: clip.transcript_segment ? (Array.isArray(clip.transcript_segment) ? clip.transcript_segment : [{ start: clip.start_time, end: clip.end_time }]) : [],
-            transcript: []
+            segments: [{ start: clip.start_time, end: clip.end_time }],
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            transcript: Array.isArray(clip.transcript_segment) ? clip.transcript_segment.map((t: any) => ({
+                timestamp: `${Math.floor((t.time || 0) / 60).toString().padStart(2, '0')}:${Math.floor((t.time || 0) % 60).toString().padStart(2, '0')}`,
+                text: t.text || ""
+            })) : []
         }));
 
         return NextResponse.json(formattedClips);

@@ -506,8 +506,12 @@ export async function getProjectClips(projectId: string) {
                 thumbnailUrl: sourceVideoId ? `https://img.youtube.com/vi/${sourceVideoId}/maxresdefault.jpg` : fallbackThumbnail,
                 startTime: c.start_time,
                 endTime: c.end_time,
-                segments: c.transcript_segment ? (Array.isArray(c.transcript_segment) ? c.transcript_segment : []) : [],
-                transcript: []
+                segments: [{ start: c.start_time, end: c.end_time }],
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                transcript: Array.isArray(c.transcript_segment) ? c.transcript_segment.map((t: any) => ({
+                    timestamp: `${Math.floor((t.time || 0) / 60).toString().padStart(2, '0')}:${Math.floor((t.time || 0) % 60).toString().padStart(2, '0')}`,
+                    text: t.text || ""
+                })) : []
             };
         });
     } catch (e) {
@@ -522,10 +526,16 @@ function extractVideoId(url: string) {
     return '';
 }
 
-export async function generateMoreClipsAction(videoUrl: string, projectId: string) {
+export async function generateMoreClipsAction(projectId: string) {
     // Re-run the analysis (random seed in virality.ts ensures variety)
     // We reuse processVideoForProject which handles DB updates too
     console.log("[Action] Generating MORE clips for project:", projectId);
-    const result = await processVideoForProject(projectId, videoUrl);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase.from('projects').select('video_url').eq('id', projectId).single() as any);
+
+    if (!data?.video_url) throw new Error("Could not find original project video URL to generate more clips.");
+
+    const result = await processVideoForProject(projectId, data.video_url);
     return result;
 }

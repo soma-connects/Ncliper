@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { SignOutButton } from "@clerk/nextjs";
+import { useClerk } from "@clerk/nextjs";
+import { useState } from "react";
 import {
     LayoutDashboard,
     FolderOpen,
@@ -11,7 +12,8 @@ import {
     Settings,
     Video,
     LogOut,
-    X
+    X,
+    Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CreditsBadge } from "@/components/dashboard/CreditsBadge";
@@ -31,6 +33,13 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
     const pathname = usePathname();
+    const { signOut } = useClerk();
+    const [isSigningOut, setIsSigningOut] = useState(false);
+
+    const handleSignOut = async () => {
+        setIsSigningOut(true);
+        await signOut({ redirectUrl: '/' });
+    };
 
     return (
         <>
@@ -53,14 +62,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             >
                 {/* Logo */}
                 <div className="p-6 flex items-center justify-between border-b border-border/40">
-                    <div className="flex items-center gap-2">
+                    <Link href="/" onClick={onClose} className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-[0_0_15px_rgba(139,92,246,0.5)]">
                             <Video className="w-5 h-5 text-white" />
                         </div>
                         <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
                             Ncliper
                         </span>
-                    </div>
+                    </Link>
                     {/* Mobile close button */}
                     <button
                         onClick={onClose}
@@ -80,7 +89,15 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                             <Link
                                 key={item.href}
                                 href={item.href}
-                                onClick={onClose}
+                                onClick={(e) => {
+                                    if (item.href === "/dashboard") {
+                                        // Force reset active state when clicking Dashboard
+                                        e.preventDefault();
+                                        window.location.href = "/dashboard";
+                                    } else {
+                                        onClose();
+                                    }
+                                }}
                                 className={cn(
                                     "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden",
                                     isActive
@@ -113,13 +130,19 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         </button>
                     </div>
 
-                    {/* Sign Out — uses Clerk's built-in SignOutButton for reliable auth cleanup */}
-                    <SignOutButton redirectUrl="/">
-                        <button className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-muted-foreground hover:bg-red-500/10 hover:text-red-400 transition-colors">
+                    {/* Sign Out — faster custom implementation with loading state */}
+                    <button
+                        onClick={handleSignOut}
+                        disabled={isSigningOut}
+                        className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-muted-foreground hover:bg-red-500/10 hover:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isSigningOut ? (
+                            <Loader2 className="w-5 h-5 flex-shrink-0 animate-spin text-red-400" />
+                        ) : (
                             <LogOut className="w-5 h-5 flex-shrink-0" />
-                            <span className="font-medium">Sign Out</span>
-                        </button>
-                    </SignOutButton>
+                        )}
+                        <span className="font-medium">{isSigningOut ? 'Signing Out...' : 'Sign Out'}</span>
+                    </button>
                 </div>
             </aside>
         </>

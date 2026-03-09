@@ -94,8 +94,12 @@ export async function GET(
                                 thumbnailUrl: sourceVideoId ? `https://img.youtube.com/vi/${sourceVideoId}/maxresdefault.jpg` : fallbackThumbnail,
                                 startTime: c.start_time,
                                 endTime: c.end_time,
-                                segments: c.transcript_segment ? (Array.isArray(c.transcript_segment) ? c.transcript_segment : [{ start: c.start_time, end: c.end_time }]) : [],
-                                transcript: []
+                                segments: [{ start: c.start_time, end: c.end_time }],
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                transcript: Array.isArray(c.transcript_segment) ? c.transcript_segment.map((t: any) => ({
+                                    timestamp: `${Math.floor((t.time || 0) / 60).toString().padStart(2, '0')}:${Math.floor((t.time || 0) % 60).toString().padStart(2, '0')}`,
+                                    text: t.text || ""
+                                })) : []
                             })),
                             metadata: {
                                 title: project.title as string,

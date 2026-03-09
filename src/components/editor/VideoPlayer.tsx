@@ -173,7 +173,7 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
                                     ref={iframeRef}
                                     src={embedUrl}
                                     title={clip.title}
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full object-contain"
                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                     allowFullScreen
                                 />
@@ -181,7 +181,7 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
                         ) : (
                             <video
                                 ref={videoRef}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain"
                                 src={clip.url}
                                 playsInline
                                 // No 'loop' attribute on the tag itself, we handle it manually
