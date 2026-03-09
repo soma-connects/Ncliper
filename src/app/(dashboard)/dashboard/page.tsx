@@ -151,6 +151,7 @@ function DashboardContent() {
                 </div>
             ) : (
                 <EditorView
+                    key={activeProject?.id || 'temp'}
                     projectId={activeProject?.id || 'temp'}
                     projectTitle={activeProject?.title || 'New Project'}
                     initialClips={projectClips || generatedClips}
