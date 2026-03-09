@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { VideoInputSection } from '@/components/dashboard/VideoInputSection';
 import { EditorView } from '@/components/dashboard/EditorView';
@@ -10,7 +10,7 @@ import { Clip } from '@/lib/video/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@clerk/nextjs';
 
-export default function DashboardHome() {
+function DashboardContent() {
     const { userId } = useAuth();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -158,5 +158,18 @@ export default function DashboardHome() {
                 />
             )}
         </div>
+    );
+}
+
+export default function DashboardHome() {
+    return (
+        <Suspense fallback={
+            <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] text-center">
+                <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4"></div>
+                <p className="text-muted-foreground font-medium">Loading Dashboard...</p>
+            </div>
+        }>
+            <DashboardContent />
+        </Suspense>
     );
 }
