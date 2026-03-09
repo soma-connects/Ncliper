@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { VideoInputSection } from '@/components/dashboard/VideoInputSection';
 import { EditorView } from '@/components/dashboard/EditorView';
 import { GlobalSearchBar } from '@/components/dashboard/GlobalSearchBar';
@@ -11,9 +12,30 @@ import { useAuth } from '@clerk/nextjs';
 
 export default function DashboardHome() {
     const { userId } = useAuth();
+    const router = useRouter();
+    const searchParams = useSearchParams();
     const queryClient = useQueryClient();
-    const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+
+    // Sync with URL parameter to survive page reloads
+    const urlProjectId = searchParams.get('project');
+    const [activeProjectId, setActiveProjectId] = useState<string | null>(urlProjectId);
     const [generatedClips, setGeneratedClips] = useState<Clip[]>([]);
+
+    useEffect(() => {
+        if (urlProjectId !== activeProjectId) {
+            setActiveProjectId(urlProjectId);
+        }
+    }, [urlProjectId]);
+
+    const handleNavigateProject = (id: string | null) => {
+        if (id) {
+            router.push(`/dashboard?project=${id}`);
+        } else {
+            router.push('/dashboard');
+            setGeneratedClips([]); // wipe local state if making a new project
+        }
+        setActiveProjectId(id);
+    };
 
     // Fetch recent projects
     const { data: projects } = useQuery({
@@ -52,7 +74,7 @@ export default function DashboardHome() {
         },
         onSuccess: (newProject) => {
             queryClient.invalidateQueries({ queryKey: ['projects', userId] });
-            setActiveProjectId(newProject.id);
+            handleNavigateProject(newProject.id);
         },
     });
 
@@ -67,7 +89,7 @@ export default function DashboardHome() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['projects', userId] });
-            if (activeProjectId) setActiveProjectId(null);
+            if (activeProjectId) handleNavigateProject(null);
         },
     });
 
@@ -85,7 +107,7 @@ export default function DashboardHome() {
         if (projectId) {
             // The pipeline already created the project server-side for Modal constraints. 
             // Just jump directly to it!
-            setActiveProjectId(projectId);
+            handleNavigateProject(projectId);
             queryClient.invalidateQueries({ queryKey: ['projects', userId] });
         } else {
             // Legacy fallback if running old mock worker
@@ -105,7 +127,7 @@ export default function DashboardHome() {
                                 <h3 className="text-lg font-medium text-white mb-4">Recent Projects</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto px-4">
                                     {projects.slice(0, 3).map((p: { id: string; title: string; status: string }) => (
-                                        <div key={p.id} onClick={() => setActiveProjectId(p.id)} className="cursor-pointer bg-card/30 border border-border p-4 rounded-lg hover:bg-card/50 transition-colors text-left group relative">
+                                        <div key={p.id} onClick={() => handleNavigateProject(p.id)} className="cursor-pointer bg-card/30 border border-border p-4 rounded-lg hover:bg-card/50 transition-colors text-left group relative">
                                             <h4 className="font-semibold text-white truncate pr-8">{p.title}</h4>
                                             <p className="text-xs text-muted-foreground mt-1 capitalize">{p.status}</p>
 
@@ -132,6 +154,7 @@ export default function DashboardHome() {
                     projectId={activeProject?.id || 'temp'}
                     projectTitle={activeProject?.title || 'New Project'}
                     initialClips={projectClips || generatedClips}
+                    onNewProject={() => handleNavigateProject(null)}
                 />
             )}
         </div>

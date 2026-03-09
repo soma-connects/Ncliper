@@ -16,9 +16,10 @@ interface EditorViewProps {
     projectTitle: string;
     projectId: string;
     initialClips?: Clip[];
+    onNewProject?: () => void;
 }
 
-export function EditorView({ projectTitle, projectId, initialClips = [] }: EditorViewProps) {
+export function EditorView({ projectTitle, projectId, initialClips = [], onNewProject }: EditorViewProps) {
     const [selectedClip, setSelectedClip] = useState<Clip | null>(null);
     const [isExporting, setIsExporting] = useState(false);
     const [selectedTab, setSelectedTab] = useState<'clips' | 'player'>('clips');
@@ -74,13 +75,15 @@ export function EditorView({ projectTitle, projectId, initialClips = [] }: Edito
         <div className="h-[calc(100vh-140px)] flex flex-col animate-in fade-in zoom-in-95 duration-500">
             {/* Editor Toolbar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 sm:mb-6 px-2 sm:px-4">
-                <div>
-                    <h2 className="text-lg sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-                        {projectTitle}
-                        <span className="px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 text-xs font-bold border border-green-500/20">
-                            PRO
-                        </span>
-                    </h2>
+                <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-3">
+                        <h2 className="text-lg sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                            {projectTitle}
+                            <span className="px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 text-xs font-bold border border-green-500/20">
+                                PRO
+                            </span>
+                        </h2>
+                    </div>
                     <p className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
                         <span className="relative flex h-2 w-2">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -89,7 +92,15 @@ export function EditorView({ projectTitle, projectId, initialClips = [] }: Edito
                         {clips.length} clips generated · Auto-saved
                     </p>
                 </div>
-                <div className="flex items-center gap-2 sm:gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                    {onNewProject && (
+                        <button
+                            onClick={onNewProject}
+                            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-secondary/80 text-white rounded-xl text-xs sm:text-sm font-semibold hover:bg-secondary transition-all"
+                        >
+                            + New Project
+                        </button>
+                    )}
                     <button
                         onClick={handleExportAll}
                         className="flex items-center gap-2 px-4 sm:px-6 py-2 bg-white text-black rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-white/10 hover:shadow-white/20 hover:scale-105 transition-all"
