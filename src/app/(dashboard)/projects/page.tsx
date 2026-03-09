@@ -55,7 +55,7 @@ export default function ProjectsPage() {
                 </div>
                 <h1 className="text-2xl font-bold text-white mb-2">No Projects Yet</h1>
                 <p className="text-muted-foreground max-w-md mb-8">
-                    You haven't generated any clips yet. Head back to the dashboard to start clipping your first video!
+                    You haven&apos;t generated any clips yet. Head back to the dashboard to start clipping your first video!
                 </p>
                 <button
                     onClick={() => router.push('/dashboard')}

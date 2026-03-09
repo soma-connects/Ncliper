@@ -1,6 +1,6 @@
 'use client';
 
-import { Play, Download, Wand2, Star, Clock } from "lucide-react";
+import { Play, Download, Wand2, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from 'react';
 import Image from "next/image"; // Added
