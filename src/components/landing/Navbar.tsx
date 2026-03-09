@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Video, Menu, X } from 'lucide-react';
+import { Video, Menu, X, LayoutDashboard } from 'lucide-react';
+import { SignedIn, SignedOut } from '@clerk/nextjs';
 
 const navLinks = [
     { label: 'Features', href: '#features' },
@@ -28,8 +29,8 @@ export function Navbar() {
             animate={{ y: 0 }}
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled
-                    ? 'bg-[#09090b]/80 backdrop-blur-xl border-b border-white/5 shadow-[0_4px_30px_rgba(0,0,0,0.3)]'
-                    : 'bg-transparent'
+                ? 'bg-[#09090b]/80 backdrop-blur-xl border-b border-white/5 shadow-[0_4px_30px_rgba(0,0,0,0.3)]'
+                : 'bg-transparent'
                 }`}
         >
             <div className="max-w-7xl mx-auto px-6 h-18 flex items-center justify-between">
@@ -59,18 +60,29 @@ export function Navbar() {
 
                 {/* CTA */}
                 <div className="hidden md:flex items-center gap-3">
-                    <Link
-                        href="/sign-in"
-                        className="text-sm font-medium text-zinc-400 hover:text-white px-4 py-2 transition-colors"
-                    >
-                        Sign In
-                    </Link>
-                    <Link
-                        href="/sign-up"
-                        className="relative text-sm font-semibold text-white px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-pink-600 hover:from-violet-500 hover:to-pink-500 transition-all duration-300 shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:shadow-[0_0_30px_rgba(139,92,246,0.5)]"
-                    >
-                        Get Started Free
-                    </Link>
+                    <SignedOut>
+                        <Link
+                            href="/sign-in"
+                            className="text-sm font-medium text-zinc-400 hover:text-white px-4 py-2 transition-colors"
+                        >
+                            Sign In
+                        </Link>
+                        <Link
+                            href="/sign-up"
+                            className="relative text-sm font-semibold text-white px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-pink-600 hover:from-violet-500 hover:to-pink-500 transition-all duration-300 shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:shadow-[0_0_30px_rgba(139,92,246,0.5)]"
+                        >
+                            Get Started Free
+                        </Link>
+                    </SignedOut>
+                    <SignedIn>
+                        <Link
+                            href="/dashboard"
+                            className="flex items-center gap-2 text-sm font-semibold text-white px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/5 transition-all duration-300"
+                        >
+                            <LayoutDashboard className="w-4 h-4" />
+                            Go to Dashboard
+                        </Link>
+                    </SignedIn>
                 </div>
 
                 {/* Mobile Toggle */}
@@ -103,15 +115,26 @@ export function Navbar() {
                                 </a>
                             ))}
                             <div className="flex flex-col gap-2 pt-3 border-t border-white/5">
-                                <Link href="/sign-in" className="text-center text-sm font-medium text-zinc-400 py-2">
-                                    Sign In
-                                </Link>
-                                <Link
-                                    href="/sign-up"
-                                    className="text-center text-sm font-semibold text-white py-3 rounded-xl bg-gradient-to-r from-violet-600 to-pink-600"
-                                >
-                                    Get Started Free
-                                </Link>
+                                <SignedOut>
+                                    <Link href="/sign-in" className="text-center text-sm font-medium text-zinc-400 py-2">
+                                        Sign In
+                                    </Link>
+                                    <Link
+                                        href="/sign-up"
+                                        className="text-center text-sm font-semibold text-white py-3 rounded-xl bg-gradient-to-r from-violet-600 to-pink-600"
+                                    >
+                                        Get Started Free
+                                    </Link>
+                                </SignedOut>
+                                <SignedIn>
+                                    <Link
+                                        href="/dashboard"
+                                        className="flex items-center justify-center gap-2 text-sm font-semibold text-white py-3 rounded-xl bg-white/10 border border-white/5"
+                                    >
+                                        <LayoutDashboard className="w-4 h-4" />
+                                        Go to Dashboard
+                                    </Link>
+                                </SignedIn>
                             </div>
                         </div>
                     </motion.div>
