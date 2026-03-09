@@ -52,8 +52,8 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
             thumbnailUrl: sourceVideoId ? `https://img.youtube.com/vi/${sourceVideoId}/maxresdefault.jpg` : fallbackThumbnail,
             startTime: clip.start_time,
             endTime: clip.end_time,
-            segments: [{ start: clip.start_time, end: clip.end_time }],
-            transcript: clip.transcript_segment || []
+            segments: clip.transcript_segment ? (Array.isArray(clip.transcript_segment) ? clip.transcript_segment : [{ start: clip.start_time, end: clip.end_time }]) : [],
+            transcript: []
         }));
 
         return NextResponse.json(formattedClips);

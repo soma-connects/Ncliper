@@ -104,7 +104,7 @@ export default function DashboardHome() {
                             <div className="mb-8">
                                 <h3 className="text-lg font-medium text-white mb-4">Recent Projects</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto px-4">
-                                    {projects.map((p: { id: string; title: string; status: string }) => (
+                                    {projects.slice(0, 3).map((p: { id: string; title: string; status: string }) => (
                                         <div key={p.id} onClick={() => setActiveProjectId(p.id)} className="cursor-pointer bg-card/30 border border-border p-4 rounded-lg hover:bg-card/50 transition-colors text-left group relative">
                                             <h4 className="font-semibold text-white truncate pr-8">{p.title}</h4>
                                             <p className="text-xs text-muted-foreground mt-1 capitalize">{p.status}</p>

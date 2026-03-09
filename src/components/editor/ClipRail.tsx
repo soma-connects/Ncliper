@@ -134,19 +134,8 @@ export function ClipRail({ onSelect, activeClipId, clips = [], projectId }: Clip
     };
 
     return (
-        <div className="w-80 h-full border-r border-border bg-card/30 flex flex-col backdrop-blur-md">
-            <div className="p-4 border-b border-white/5 bg-card/50 backdrop-blur-sm">
-                <h3 className="font-semibold text-white flex items-center gap-2 tracking-tight">
-                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 animate-[spin_10s_linear_infinite]" />
-                    Viral Shorts
-                    <span className="ml-auto text-[10px] font-bold text-muted-foreground bg-secondary/50 px-2 py-0.5 rounded-full border border-white/5">
-                        {clips.length} CLIPS
-                    </span>
-                </h3>
-            </div>
-
-            {/* ... List ... */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+        <div className="w-full flex flex-col gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                 <AnimatePresence>
                     {clips.map((clip, index) => {
                         const isActive = activeClipId === clip.id;
@@ -264,14 +253,14 @@ export function ClipRail({ onSelect, activeClipId, clips = [], projectId }: Clip
                 </AnimatePresence>
             </div>
 
-            <div className="p-4 border-t border-white/5 bg-card/50">
+            <div className="w-full mt-4 flex items-center justify-center">
                 <button
                     onClick={handleGenerateMore}
                     disabled={isGeneratingMore || !projectId}
-                    className="w-full relative overflow-hidden group flex items-center justify-center gap-2 text-xs font-bold text-muted-foreground hover:text-white p-3 rounded-xl border border-dashed border-white/10 hover:border-primary/50 hover:bg-primary/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                    className="w-full md:w-auto min-w-[300px] relative overflow-hidden group flex items-center justify-center gap-2 text-sm font-bold text-muted-foreground hover:text-white p-4 rounded-xl border border-dashed border-white/10 hover:border-primary/50 hover:bg-primary/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                     <span className="relative z-10 flex items-center gap-2">
-                        {isGeneratingMore ? <Wand2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5 group-hover:animate-pulse" />}
-                        {isGeneratingMore ? 'Generating...' : 'Generate More Clips'}
+                        {isGeneratingMore ? <Wand2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4 group-hover:animate-pulse" />}
+                        {isGeneratingMore ? 'Generating Deep Clips...' : 'Generate More Viral Clips'}
                     </span>
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
                 </button>
