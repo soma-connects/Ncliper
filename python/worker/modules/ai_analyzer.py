@@ -203,7 +203,12 @@ Find segments that can stand alone as complete mini-stories or value bombs.
 **INTELLIGENT MERGING:**
 -   Merge widely separated sentences if they form a coherent narrative.
 -   Example: Intro (0:10) + Conclusion (5:45) = 1 powerful clip.
--   Total duration MUST be 15-60 seconds (ideal for Shorts).
+-   Total duration MUST be 30-90 seconds (ideal for modern, deeper-storytelling Shorts).
+
+**QUANTITY OF CLIPS TO FIND:**
+-   You MUST find and extract **at least 5 to 8** distinct viral hooks from the transcript.
+-   Do not stop at 1 or 2. Provide a rich variety of content for the user.
+-   If the video is very long, feel free to extract up to 12.
 
 **SPEAKER DIARIZATION (CRITICAL FOR PODCASTS)**:
 - If there are multiple active speakers (e.g., a podcast format), you must generate a `speaker_timeline`.

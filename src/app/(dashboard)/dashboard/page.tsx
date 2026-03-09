@@ -94,7 +94,7 @@ export default function DashboardHome() {
     };
 
     return (
-        <div className="flex flex-col min-h-[calc(100vh-100px)]">
+        <div className={`flex flex-col ${(!activeProjectId && generatedClips.length === 0) ? "min-h-[calc(100vh-100px)]" : "h-[calc(100vh-100px)] lg:h-[calc(100vh-120px)]"}`}>
             {!activeProjectId && generatedClips.length === 0 ? (
                 <div className="flex-1 flex flex-col justify-center mt-12">
                     <GlobalSearchBar />
