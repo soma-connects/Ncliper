@@ -11,9 +11,22 @@ export async function getTotalUsers() {
 }
 
 export async function getStorageMetrics() {
-  // In a real app we'd query the Supabase storage schema or R2 bucket metrics
-  // For MVP, we return a mock value
-  return { totalGB: 0, totalMB: 500 }
+  // Estimate based on number of clips and jobs in the database
+  const { count: clipsCount } = await supabaseAdmin.from('clips').select('*', { count: 'exact', head: true });
+  const { count: jobsCount } = await supabaseAdmin.from('jobs').select('*', { count: 'exact', head: true });
+  
+  // Realistically, a raw video download on Modal averages ~300MB, and extracted 30-sec clips average ~15MB.
+  // We'll estimate usage without doing an expensive raw Supabase Storage Object scan
+  const estimatedClipsMb = (clipsCount || 0) * 15;
+  const estimatedJobsMb = (jobsCount || 0) * 300;
+  
+  const totalMB = estimatedClipsMb + estimatedJobsMb;
+  const totalGB = totalMB > 1000 ? (totalMB / 1024).toFixed(2) : 0;
+  
+  return { 
+    totalGB: Number(totalGB), 
+    totalMB: totalMB 
+  }
 }
 
 export async function getActivityHeatmapData() {
@@ -73,4 +86,36 @@ export async function getWorkerQueue() {
           url: job.video_url
       }
   })
+}
+
+export async function getEstimatedApiCosts() {
+  const { data: jobs, error } = await supabaseAdmin.from('jobs').select('status, processing_started_at, processing_completed_at')
+  
+  let modalSeconds = 0;
+  let successfulJobs = 0;
+
+  if (!error && jobs) {
+      jobs.forEach((job: any) => {
+          if (job.status === 'completed' || job.status === 'success') {
+              successfulJobs++;
+          }
+          if (job.processing_started_at) {
+              const start = new Date(job.processing_started_at).getTime()
+              const end = job.processing_completed_at ? new Date(job.processing_completed_at).getTime() : new Date().getTime()
+              modalSeconds += Math.floor((end - start) / 1000)
+          }
+      })
+  }
+
+  // Modal L4 GPU cost is ~$0.74/hour -> ~$0.000205 per second.
+  const modalCost = modalSeconds * 0.000205;
+  
+  // Gemini 1.5 Flash is extremely cheap ($0.075 per 1M tokens). Let's estimate roughly $0.005 per successfully analyzed video
+  const geminiCost = successfulJobs * 0.005;
+
+  return {
+      modal: modalCost.toFixed(2),
+      gemini: geminiCost.toFixed(2),
+      total: (modalCost + geminiCost).toFixed(2)
+  }
 }
