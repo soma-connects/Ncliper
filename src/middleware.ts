@@ -17,10 +17,14 @@ export default clerkMiddleware(async (auth, request) => {
             await auth.protect()
         }
         
-        // Ensure the user has the 'admin' role
+        // Ensure the user has the 'admin' role OR is the primary admin email
         const metadata = authObject.sessionClaims?.metadata as { role?: string } | undefined
+        const email = authObject.sessionClaims?.email as string | undefined
         const role = metadata?.role
-        if (role !== 'admin') {
+        
+        const isEmailAdmin = email === 'pauljizy@gmail.com'
+        
+        if (role !== 'admin' && !isEmailAdmin) {
             return new Response(null, {
                 status: 302,
                 headers: { Location: new URL('/dashboard', request.url).toString() },

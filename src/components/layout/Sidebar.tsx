@@ -38,7 +38,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     const { user } = useUser();
     const [isSigningOut, setIsSigningOut] = useState(false);
 
-    const isAdmin = user?.publicMetadata?.role === 'admin';
+    const isAdmin = user?.publicMetadata?.role === 'admin' || 
+                    user?.primaryEmailAddress?.emailAddress === 'pauljizy@gmail.com';
 
     const handleSignOut = async () => {
         setIsSigningOut(true);
