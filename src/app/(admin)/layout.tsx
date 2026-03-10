@@ -1,5 +1,5 @@
 import { SidebarProvider, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar"
-import { LayoutDashboard, Users, Server, DollarSign, Database } from "lucide-react"
+import { LayoutDashboard, Users, Server, DollarSign, Database, ArrowLeft } from "lucide-react"
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -8,7 +8,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <Sidebar>
           <SidebarContent>
             <SidebarGroup>
-              <SidebarGroupLabel>Ncliper Admin</SidebarGroupLabel>
+              <SidebarGroupLabel>
+                <div className="flex items-center justify-between w-full">
+                  <span>Ncliper Admin</span>
+                  <a href="/dashboard" className="text-[10px] text-muted-foreground hover:text-white transition-colors flex items-center gap-1">
+                    <ArrowLeft className="w-3 h-3" />
+                    App
+                  </a>
+                </div>
+              </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
                   <SidebarMenuItem>

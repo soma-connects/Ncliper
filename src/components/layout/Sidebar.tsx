@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useClerk } from "@clerk/nextjs";
+import { useClerk, useUser } from "@clerk/nextjs";
 import { useState } from "react";
 import {
     LayoutDashboard,
@@ -13,7 +13,8 @@ import {
     Video,
     LogOut,
     X,
-    Loader2
+    Loader2,
+    Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CreditsBadge } from "@/components/dashboard/CreditsBadge";
@@ -34,7 +35,10 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
     const pathname = usePathname();
     const { signOut } = useClerk();
+    const { user } = useUser();
     const [isSigningOut, setIsSigningOut] = useState(false);
+
+    const isAdmin = user?.publicMetadata?.role === 'admin';
 
     const handleSignOut = async () => {
         setIsSigningOut(true);
@@ -108,7 +112,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                                 <item.icon className={cn(
                                     "w-5 h-5 transition-transform duration-300 group-hover:scale-110 flex-shrink-0",
                                     isActive ? "text-primary" : "text-muted-foreground group-hover:text-white"
-                                )} />
+                                )}/>
                                 <span className="font-medium truncate">{item.label}</span>
 
                                 {isActive && (
@@ -117,6 +121,29 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                             </Link>
                         );
                     })}
+
+                    {/* Admin section */}
+                    {isAdmin && (
+                        <div className="mt-6 pt-6 border-t border-border/40">
+                            <p className="px-4 mb-2 text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Admin</p>
+                            <Link
+                                href="/admin"
+                                onClick={onClose}
+                                className={cn(
+                                    "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden",
+                                    pathname.startsWith("/admin")
+                                        ? "bg-amber-500/10 text-amber-500 border border-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.1)]"
+                                        : "text-muted-foreground hover:text-white hover:bg-white/5"
+                                )}
+                            >
+                                <Shield className={cn(
+                                    "w-5 h-5 transition-transform duration-300 group-hover:scale-110 flex-shrink-0",
+                                    pathname.startsWith("/admin") ? "text-amber-500" : "text-muted-foreground group-hover:text-white"
+                                )} />
+                                <span className="font-medium truncate">Admin Panel</span>
+                            </Link>
+                        </div>
+                    )}
                 </nav>
 
                 {/* Bottom section: Credits + Sign Out */}
