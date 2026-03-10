@@ -9,9 +9,13 @@ import { Clip } from '@/lib/video/types';
 
 interface VideoPlayerProps {
     clip?: Clip | null;
+    onTimeUpdate?: (time: number) => void;
+    onMarkIn?: (time: number) => void;
+    onMarkOut?: (time: number) => void;
+    seekTo?: number | null;
 }
 
-export function VideoPlayer({ clip }: VideoPlayerProps) {
+export function VideoPlayer({ clip, onTimeUpdate, onMarkIn, onMarkOut, seekTo }: VideoPlayerProps) {
     const [isPlaying, setIsPlaying] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
     const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -23,6 +27,53 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
     // Detect video source type
     const isYouTube = clip?.url?.includes('youtube.com') || clip?.url?.includes('youtu.be');
     const isR2 = clip?.url?.includes('.r2.dev') || clip?.url?.startsWith('https://');
+
+    // Handle external seek requests
+    useEffect(() => {
+        if (seekTo !== null && seekTo !== undefined && videoRef.current && !isYouTube) {
+            videoRef.current.currentTime = seekTo;
+            setCurrentTime(seekTo);
+        }
+    }, [seekTo, isYouTube]);
+
+    // Keyboard Shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (!videoRef.current || isYouTube) return;
+            // Ignore if user is typing in an input
+            if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+
+            const video = videoRef.current;
+            
+            switch (e.key.toLowerCase()) {
+                case ' ':
+                    e.preventDefault();
+                    togglePlay();
+                    break;
+                case 'arrowleft':
+                    video.currentTime = Math.max(0, video.currentTime - 5);
+                    break;
+                case 'arrowright':
+                    video.currentTime = Math.min(video.duration, video.currentTime + 5);
+                    break;
+                case 'j':
+                    video.currentTime = Math.max(0, video.currentTime - 1);
+                    break;
+                case 'l':
+                    video.currentTime = Math.min(video.duration, video.currentTime + 1);
+                    break;
+                case 'i':
+                    if (onMarkIn) onMarkIn(video.currentTime);
+                    break;
+                case 'o':
+                    if (onMarkOut) onMarkOut(video.currentTime);
+                    break;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [clip, isYouTube, isPlaying, onMarkIn, onMarkOut]);
 
     // YouTube Embed: Use simpler integers but try to respect bounds
     // Note: YouTube 'end' param stops playback. It does not loop automatically.
@@ -63,13 +114,15 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
     }, [clip, isYouTube, isR2]);
 
     const togglePlay = () => {
-        setIsPlaying(!isPlaying);
-        if (isYouTube) {
-            // Iframe toggle handled by re-render/autoplay param mainly
-            // or we accept it's just an overlay toggle
-        } else if (videoRef.current) {
-            if (isPlaying) videoRef.current.pause();
-            else videoRef.current.play();
+        if (isYouTube) return; // YouTube iframe controls its own playback
+        if (videoRef.current) {
+            if (isPlaying) {
+                videoRef.current.pause();
+                setIsPlaying(false);
+            } else {
+                videoRef.current.play();
+                setIsPlaying(true);
+            }
         }
     };
 
@@ -77,6 +130,7 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
         if (videoRef.current && clip) {
             const current = videoRef.current.currentTime;
             setCurrentTime(current);
+            if (onTimeUpdate) onTimeUpdate(current);
 
             // Manual Loop Logic - Different for R2 vs Source Videos
             if (isR2) {
@@ -104,6 +158,20 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
                 const pct = Math.max(0, Math.min(100, (relativeTime / clipDuration) * 100));
                 setProgress(pct);
             }
+        }
+    };
+
+    const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!videoRef.current || !clip) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const pct = x / rect.width;
+        
+        if (isR2) {
+            videoRef.current.currentTime = pct * videoRef.current.duration;
+        } else {
+            const clipDuration = clip.endTime - clip.startTime;
+            videoRef.current.currentTime = clip.startTime + (pct * clipDuration);
         }
     };
 
@@ -181,13 +249,15 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
                         ) : (
                             <video
                                 ref={videoRef}
-                                className="w-full h-full object-contain"
+                                className="w-full h-full object-contain cursor-pointer"
                                 src={clip.url}
                                 playsInline
                                 // No 'loop' attribute on the tag itself, we handle it manually
                                 autoPlay
                                 onTimeUpdate={handleTimeUpdate}
                                 onClick={togglePlay}
+                                onPlay={() => setIsPlaying(true)}
+                                onPause={() => setIsPlaying(false)}
                             />
                         )}
                     </motion.div>
@@ -228,7 +298,10 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
                     </div>
 
                     {/* Progress Bar */}
-                    <div className="w-full h-1.5 bg-white/20 rounded-full mb-6 cursor-pointer group/progress">
+                    <div 
+                        className="w-full h-1.5 bg-white/20 rounded-full mb-6 cursor-pointer group/progress relative"
+                        onClick={handleProgressClick}
+                    >
                         <div
                             className="h-full bg-primary relative group-hover/progress:bg-primary/80 transition-colors rounded-full"
                             style={{ width: `${progress}%` }}
@@ -241,7 +314,10 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
                     <div className="flex items-center justify-between px-4">
                         <Volume2 className="w-5 h-5 text-white/50 hover:text-white cursor-pointer" />
                         <div className="flex items-center gap-6">
-                            <SkipBack className="w-6 h-6 text-white hover:text-primary transition-colors cursor-pointer active:scale-90" />
+                            <SkipBack 
+                                className="w-6 h-6 text-white hover:text-primary transition-colors cursor-pointer active:scale-90" 
+                                onClick={() => { if(videoRef.current) videoRef.current.currentTime -= 5 }}
+                            />
                             <button
                                 onClick={togglePlay}
                                 className="w-14 h-14 rounded-full bg-white flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-lg shadow-white/10"
@@ -252,7 +328,10 @@ export function VideoPlayer({ clip }: VideoPlayerProps) {
                                     <Play className="w-6 h-6 text-black fill-current ml-1" />
                                 )}
                             </button>
-                            <SkipForward className="w-6 h-6 text-white hover:text-primary transition-colors cursor-pointer active:scale-90" />
+                            <SkipForward 
+                                className="w-6 h-6 text-white hover:text-primary transition-colors cursor-pointer active:scale-90"
+                                onClick={() => { if(videoRef.current) videoRef.current.currentTime += 5 }}
+                            />
                         </div>
                         <div className="w-5" />
                     </div>

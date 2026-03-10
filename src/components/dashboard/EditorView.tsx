@@ -20,17 +20,21 @@ interface EditorViewProps {
 }
 
 export function EditorView({ projectTitle, projectId, initialClips = [], onNewProject }: EditorViewProps) {
+    // Editor State
     const [selectedClip, setSelectedClip] = useState<Clip | null>(null);
     const [isExporting, setIsExporting] = useState(false);
     const [selectedTab, setSelectedTab] = useState<'clips' | 'player'>('clips');
     const [copiedTranscript, setCopiedTranscript] = useState(false);
 
-    // Prompt-to-Clip State
+    // Clipping / Tuning State
     const [activeMatch, setActiveMatch] = useState<{ start_time: number; end_time: number; snippet: string; confidence: number } | null>(null);
     const [tunedStart, setTunedStart] = useState(0);
     const [tunedEnd, setTunedEnd] = useState(0);
+    const [videoTime, setVideoTime] = useState(0);
+    const [seekTarget, setSeekTarget] = useState<number | null>(null);
     const [showCopyrightModal, setShowCopyrightModal] = useState(false);
 
+    // ... (query setup remains same) ...
     // Use initialClips if provided, otherwise fallback to query
     const { data: fetchedClips } = useQuery({
         queryKey: ['clips', projectId],
@@ -73,6 +77,7 @@ export function EditorView({ projectTitle, projectId, initialClips = [], onNewPr
 
     return (
         <div className="h-[calc(100vh-140px)] flex flex-col animate-in fade-in zoom-in-95 duration-500">
+            {/* ... (Editor Toolbar remains same) ... */}
             {/* Editor Toolbar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 sm:mb-6 px-2 sm:px-4">
                 <div className="flex flex-col gap-1">
@@ -159,6 +164,7 @@ export function EditorView({ projectTitle, projectId, initialClips = [], onNewPr
                                         transcript: [],
                                     };
                                     setSelectedClip(previewClip);
+                                    setSeekTarget(match.start_time);
                                 }}
                             />
                         </div>
@@ -172,7 +178,19 @@ export function EditorView({ projectTitle, projectId, initialClips = [], onNewPr
                                     <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent pointer-events-none" />
                                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-primary/10 blur-[100px] rounded-full pointer-events-none opacity-50" />
                                     <div className="z-10">
-                                        <VideoPlayer clip={selectedClip} />
+                                        <VideoPlayer 
+                                            clip={selectedClip} 
+                                            onTimeUpdate={setVideoTime}
+                                            onMarkIn={(time) => {
+                                                setTunedStart(Number(time.toFixed(1)));
+                                                if (selectedClip) setSelectedClip({ ...selectedClip, startTime: time });
+                                            }}
+                                            onMarkOut={(time) => {
+                                                setTunedEnd(Number(time.toFixed(1)));
+                                                if (selectedClip) setSelectedClip({ ...selectedClip, endTime: time });
+                                            }}
+                                            seekTo={seekTarget}
+                                        />
                                     </div>
                                 </div>
 
@@ -183,16 +201,30 @@ export function EditorView({ projectTitle, projectId, initialClips = [], onNewPr
                                             startTime={tunedStart}
                                             endTime={tunedEnd}
                                             onStartChange={(newStart) => {
-                                                setTunedStart(newStart);
+                                                const start = Number(newStart.toFixed(1));
+                                                setTunedStart(start);
+                                                setSeekTarget(start);
                                                 if (selectedClip) {
-                                                    setSelectedClip({ ...selectedClip, startTime: newStart });
+                                                    setSelectedClip({ ...selectedClip, startTime: start });
                                                 }
                                             }}
                                             onEndChange={(newEnd) => {
-                                                setTunedEnd(newEnd);
+                                                const end = Number(newEnd.toFixed(1));
+                                                setTunedEnd(end);
+                                                setSeekTarget(end);
                                                 if (selectedClip) {
-                                                    setSelectedClip({ ...selectedClip, endTime: newEnd });
+                                                    setSelectedClip({ ...selectedClip, endTime: end });
                                                 }
+                                            }}
+                                            onMarkStart={() => {
+                                                const time = Number(videoTime.toFixed(1));
+                                                setTunedStart(time);
+                                                if (selectedClip) setSelectedClip({ ...selectedClip, startTime: time });
+                                            }}
+                                            onMarkEnd={() => {
+                                                const time = Number(videoTime.toFixed(1));
+                                                setTunedEnd(time);
+                                                if (selectedClip) setSelectedClip({ ...selectedClip, endTime: time });
                                             }}
                                         />
                                         <button
