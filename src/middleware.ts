@@ -1,5 +1,4 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
-
+import { clerkMiddleware, createRouteMatcher, createClerkClient } from '@clerk/nextjs/server'
 const isPublicRoute = createRouteMatcher([
     '/',                    // Landing page
     '/sign-in(.*)',
@@ -10,19 +9,26 @@ const isPublicRoute = createRouteMatcher([
 
 const isAdminRoute = createRouteMatcher(['/admin(.*)'])
 
+const client = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY })
 export default clerkMiddleware(async (auth, request) => {
     if (isAdminRoute(request)) {
         const authObject = await auth()
-        if (!authObject.userId) {
+        const { userId } = authObject
+        if (!userId) {
             await auth.protect()
+            return
         }
         
-        // Ensure the user has the 'admin' role OR is the primary admin email
-        const metadata = authObject.sessionClaims?.metadata as { role?: string } | undefined
-        const email = authObject.sessionClaims?.email as string | undefined
+        // Fetch full user object to ensure we have current metadata and email
+        const user = await client.users.getUser(userId)
+        
+        const metadata = user.publicMetadata as { role?: string } | undefined
         const role = metadata?.role
         
-        const isEmailAdmin = email === 'pauljizy@gmail.com'
+        // Loop through all emails to guarantee a match, case-insensitive
+        const isEmailAdmin = user.emailAddresses.some(
+            e => e.emailAddress.toLowerCase() === 'pauljizy@gmail.com'
+        )
         
         if (role !== 'admin' && !isEmailAdmin) {
             return new Response(null, {
