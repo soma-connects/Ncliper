@@ -51,6 +51,8 @@ export interface Database {
                     settings: Json | null
                     result_data: Json | null
                     error: string | null
+                    processing_started_at: string | null
+                    processing_completed_at: string | null
                 }
                 Insert: {
                     id?: string

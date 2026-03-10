@@ -25,7 +25,7 @@ function DashboardContent() {
         if (urlProjectId !== activeProjectId) {
             setActiveProjectId(urlProjectId);
         }
-    }, [urlProjectId]);
+    }, [urlProjectId, activeProjectId]);
 
     const handleNavigateProject = (id: string | null) => {
         if (id) {

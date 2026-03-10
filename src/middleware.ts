@@ -8,8 +8,25 @@ const isPublicRoute = createRouteMatcher([
     '/api/health(.*)',
 ])
 
+const isAdminRoute = createRouteMatcher(['/admin(.*)'])
+
 export default clerkMiddleware(async (auth, request) => {
-    if (!isPublicRoute(request)) {
+    if (isAdminRoute(request)) {
+        const authObject = await auth()
+        if (!authObject.userId) {
+            await auth.protect()
+        }
+        
+        // Ensure the user has the 'admin' role
+        const metadata = authObject.sessionClaims?.metadata as { role?: string } | undefined
+        const role = metadata?.role
+        if (role !== 'admin') {
+            return new Response(null, {
+                status: 302,
+                headers: { Location: new URL('/dashboard', request.url).toString() },
+            })
+        }
+    } else if (!isPublicRoute(request)) {
         await auth.protect()
     }
 })
